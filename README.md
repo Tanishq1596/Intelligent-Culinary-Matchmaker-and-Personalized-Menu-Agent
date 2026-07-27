@@ -74,7 +74,7 @@ The classification notebook compares 12 classifier families, including logistic 
 | Culinary knowledge base | 1,000 dishes | Ingredients, allergens, tags, substitutions, and RAG |
 | Synthetic order history | 40,000 orders / 5,000 users | Classification and regression training |
 
-The final dish dataset is deduplicated by `restaurant_id + normalized_dish_name`. The separate Pune files are an experimental curated extension and are not merged into the default application dataset.
+The final dish dataset is deduplicated by `restaurant_id + normalized_dish_name`.
 
 ## Safety Design
 
