@@ -1,0 +1,197 @@
+"""Deterministic dietary and allergen checks for retrieved dish knowledge."""
+
+from collections.abc import Mapping
+import re
+
+
+LIKELY_COMPATIBLE = "Likely compatible"
+POSSIBLE_CONFLICT = "Possible dietary conflict"
+REJECTED = "Rejected due to known conflict"
+INFORMATION_UNAVAILABLE = "Ingredient information unavailable"
+
+DISCLAIMER = (
+    "Generic recipe data cannot guarantee medical safety. Confirm ingredients "
+    "and cross-contamination risks directly with the restaurant."
+)
+
+# Each restriction maps to ingredients or tags that conflict with it.
+CONFLICT_TERMS = {
+    "lactose intolerance": (
+        "dairy", "milk", "cream", "butter", "paneer", "cheese",
+        "curd", "yogurt", "yoghurt", "ghee", "khoya",
+    ),
+    "peanut allergy": ("peanut", "peanuts", "groundnut", "groundnuts"),
+    "tree nut allergy": (
+        "tree nut", "tree nuts", "cashew", "cashews", "almond", "almonds",
+        "walnut", "walnuts", "pistachio", "pistachios", "hazelnut", "hazelnuts",
+    ),
+    "gluten sensitivity": (
+        "gluten", "wheat", "maida", "semolina", "sooji", "suji", "barley", "bread",
+    ),
+    "egg allergy": ("egg", "eggs", "mayonnaise", "mayo"),
+    "soy allergy": ("soy", "soya", "soybean", "soybeans", "tofu", "tempeh"),
+    "vegan": (
+        "dairy", "milk", "cream", "butter", "paneer", "cheese", "curd",
+        "yogurt", "yoghurt", "ghee", "khoya", "egg", "eggs", "mayonnaise",
+        "chicken", "mutton", "lamb", "fish", "seafood", "meat", "beef", "pork",
+        "prawn", "prawns", "shrimp", "gelatin", "honey", "non vegetarian",
+        "non veg", "contains egg",
+    ),
+    "vegetarian": (
+        "egg", "eggs", "chicken", "mutton", "lamb", "fish", "seafood", "meat",
+        "beef", "pork", "prawn", "prawns", "shrimp", "gelatin",
+        "non vegetarian", "non veg", "contains egg",
+    ),
+}
+
+RESTRICTION_ALIASES = {
+    "lactose intolerant": "lactose intolerance",
+    "lactose intolerance": "lactose intolerance",
+    "peanut allergy": "peanut allergy",
+    "peanut allergic": "peanut allergy",
+    "tree nut allergy": "tree nut allergy",
+    "tree nut allergic": "tree nut allergy",
+    "gluten sensitivity": "gluten sensitivity",
+    "gluten sensitive": "gluten sensitivity",
+    "egg allergy": "egg allergy",
+    "egg allergic": "egg allergy",
+    "soy allergy": "soy allergy",
+    "soya allergy": "soy allergy",
+    "soy allergic": "soy allergy",
+    "vegan": "vegan",
+    "vegetarian": "vegetarian",
+}
+
+DIRECT_FIELDS = ("common_ingredients", "allergens", "dietary_tags")
+POSSIBLE_FIELDS = ("ingredient_variations", "preparation_method")
+UNCERTAIN_WORDS = (
+    "possible", "possibly", "may contain", "may use", "might contain",
+    "trace", "traces", "cross contamination", "varies", "variation",
+)
+
+
+def normalize_text(value):
+    """Create lowercase searchable text while preserving word boundaries."""
+    text = str(value or "").casefold().replace("_", " ").replace("-", " ")
+    return " ".join(text.split())
+
+
+def normalize_restrictions(restrictions):
+    """Return unique supported restriction names and reject unknown values."""
+    if restrictions is None:
+        return []
+    if isinstance(restrictions, str):
+        restrictions = [restrictions]
+
+    normalized = []
+    for restriction in restrictions:
+        key = normalize_text(restriction)
+        name = RESTRICTION_ALIASES.get(key)
+        if name is None:
+            supported = ", ".join(CONFLICT_TERMS)
+            raise ValueError(f"Unsupported restriction: {restriction}. Supported: {supported}")
+        if name not in normalized:
+            normalized.append(name)
+    return normalized
+
+
+def has_term(text, term):
+    """Match a whole ingredient term, so 'egg' does not match 'eggplant'."""
+    pattern = rf"(?<![a-z0-9]){re.escape(normalize_text(term))}(?![a-z0-9])"
+    return re.search(pattern, normalize_text(text)) is not None
+
+
+def split_items(value):
+    """Split semicolon and comma separated knowledge fields into items."""
+    return [item.strip() for item in re.split(r"[;,|]+", normalize_text(value)) if item.strip()]
+
+
+def rag_record(rag_result):
+    """Accept either a RetrievalResult object or its dictionary representation."""
+    if isinstance(rag_result, Mapping):
+        return dict(rag_result)
+    if hasattr(rag_result, "to_dict"):
+        return rag_result.to_dict()
+    raise TypeError("rag_result must be a RetrievalResult or dictionary")
+
+
+def find_conflicts(record, restrictions):
+    """Return detected terms with direct conflicts taking priority."""
+    conflicts = {}
+
+    for restriction in restrictions:
+        for field in DIRECT_FIELDS + POSSIBLE_FIELDS:
+            default_level = "possible" if field in POSSIBLE_FIELDS else "direct"
+            for item in split_items(record.get(field, "")):
+                level = default_level
+                if any(has_term(item, word) for word in UNCERTAIN_WORDS):
+                    level = "possible"
+
+                for term in CONFLICT_TERMS[restriction]:
+                    if not has_term(item, term):
+                        continue
+                    previous_level = conflicts.get(term)
+                    if previous_level != "direct":
+                        conflicts[term] = level
+
+    direct = [term for term, level in conflicts.items() if level == "direct"]
+    possible = [term for term, level in conflicts.items() if level == "possible"]
+    return direct, possible
+
+
+def check_dish_safety(user_restrictions, rag_result):
+    """Classify one RAG result using deterministic dietary and allergy rules."""
+    restrictions = normalize_restrictions(user_restrictions)
+    record = rag_record(rag_result)
+    retrieval_status = normalize_text(record.get("retrieval_status", ""))
+    dish_name = (
+        record.get("requested_dish")
+        or record.get("dish_name")
+        or record.get("matched_dish")
+        or "Unknown dish"
+    )
+
+    if retrieval_status != "matched":
+        return {
+            "dish_name": dish_name,
+            "safety_status": INFORMATION_UNAVAILABLE,
+            "detected_conflicts": [],
+            "conflict_level": "Unknown",
+            "reason": "RAG did not return a reliable match, so compatibility cannot be assessed.",
+            "retrieval_status": record.get("retrieval_status", "unknown"),
+            "disclaimer": DISCLAIMER,
+        }
+
+    direct, possible = find_conflicts(record, restrictions)
+
+    if direct:
+        status = REJECTED
+        level = "Direct"
+        detected = direct + [term for term in possible if term not in direct]
+        reason = "Known restricted terms were found: " + ", ".join(direct) + "."
+    elif possible:
+        status = POSSIBLE_CONFLICT
+        level = "Possible"
+        detected = possible
+        reason = "Restricted terms may occur depending on preparation: " + ", ".join(possible) + "."
+    else:
+        status = LIKELY_COMPATIBLE
+        level = "None"
+        detected = []
+        reason = "No listed conflicts were found in the matched generic recipe information."
+
+    return {
+        "dish_name": dish_name,
+        "safety_status": status,
+        "detected_conflicts": detected,
+        "conflict_level": level,
+        "reason": reason,
+        "retrieval_status": record.get("retrieval_status", "matched"),
+        "disclaimer": DISCLAIMER,
+    }
+
+
+def screen_dishes(user_restrictions, rag_results):
+    """Apply the same safety rules to every shortlisted RAG result."""
+    return [check_dish_safety(user_restrictions, result) for result in rag_results]
+

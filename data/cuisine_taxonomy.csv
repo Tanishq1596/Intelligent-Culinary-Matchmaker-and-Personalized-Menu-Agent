@@ -1,0 +1,83 @@
+cuisine,source_record_count,source_share,median_dish_price
+Afghani,13,0.00013,123
+African,8,8e-05,379
+American,2443,0.02443,199
+Andhra,365,0.00365,209
+Arabian,488,0.00488,180
+Asian,1063,0.01063,249
+Assamese,3,3e-05,80
+Bakery,4211,0.04211,210
+Barbecue,339,0.00339,319
+Bengali,1210,0.0121,247
+Beverages,12934,0.12934,160
+Bihari,8,8e-05,105
+Biryani,4274,0.04274,229
+British,16,0.00016,179
+Burgers,1132,0.01132,169
+Burmese,140,0.0014,375
+Cafe,342,0.00342,169
+Chaat,713,0.00713,115
+Chettinad,77,0.00077,182
+Chinese,21376,0.21376,200
+Coastal,45,0.00045,120
+Combo,812,0.00812,209
+Continental,3792,0.03792,240
+Desserts,7763,0.07763,171
+European,7,7e-05,200
+Fast Food,7719,0.07719,140
+French,18,0.00018,215
+Grill,204,0.00204,230
+Gujarati,2169,0.02169,150
+Healthy Food,1915,0.01915,257
+Home Food,102,0.00102,179
+Hyderabadi,339,0.00339,265
+Ice Cream,3497,0.03497,171
+Ice Cream Cakes,456,0.00456,227
+Indian,20278,0.20278,190
+Italian,4830,0.0483,225
+Italian-American,432,0.00432,160
+Jain,101,0.00101,230
+Japanese,208,0.00208,380
+Juices,1036,0.01036,130
+Kebabs,365,0.00365,190
+Kerala,370,0.0037,170
+Keto,17,0.00017,249
+Korean,22,0.00022,290
+Lebanese,94,0.00094,170
+Lucknowi,9,9e-05,180
+Maharashtrian,432,0.00432,149
+Malaysian,7,7e-05,249
+Mangalorean,68,0.00068,190
+Mediterranean,194,0.00194,329
+Mexican,1358,0.01358,239
+Middle Eastern,122,0.00122,290
+Mughlai,1490,0.0149,230
+Naga,11,0.00011,300
+Nepalese,18,0.00018,199
+North Eastern,20,0.0002,250
+North Indian,23377,0.23377,190
+Oriental,153,0.00153,390
+Oriya,27,0.00027,190
+Paan,22,0.00022,60
+Pan-Asian,376,0.00376,239
+Pastas,1342,0.01342,199
+Pizzas,8510,0.0851,200
+Portuguese,8,8e-05,379
+Punjabi,4116,0.04116,198
+Rajasthani,375,0.00375,150
+SVANidhi Street Food Vendor,12,0.00012,75
+Salads,678,0.00678,230
+Seafood,504,0.00504,260
+Snacks,11618,0.11618,120
+South Indian,6499,0.06499,159
+Steakhouse,18,0.00018,344
+Street Food,2344,0.02344,100
+Sushi,25,0.00025,475
+Sweets,1905,0.01905,143
+Tandoor,1146,0.01146,215
+Tex-Mex,2,2e-05,175
+Thai,704,0.00704,280
+Thalis,1482,0.01482,180
+Tibetan,255,0.00255,158
+Turkish,30,0.0003,236
+Waffle,793,0.00793,139

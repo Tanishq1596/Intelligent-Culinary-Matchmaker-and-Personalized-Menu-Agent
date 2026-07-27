@@ -1,0 +1,22 @@
+{
+  "collection_name": "culinary_dishes_v1",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dimensions": 384,
+  "distance_metric": "cosine",
+  "distance_threshold": 0.35,
+  "dataset_sha256": "0ef84780ae8be240e55349a3f298e9b401a62575e47eca6d6b9d7c09527cb7ba",
+  "canonical_rows": 985,
+  "normalizer_version": 1,
+  "document_schema_version": 1,
+  "query_schema_version": 2,
+  "created_at_utc": "2026-07-22T10:46:39.602523+00:00",
+  "validation": {
+    "input_rows": 1000,
+    "canonical_rows": 985,
+    "dropped_blank_dish_names": 0,
+    "removed_normalized_duplicates": 15,
+    "missing_ingredients_after_fallback": 0,
+    "missing_allergens_after_fallback": 0,
+    "dataset_sha256": "0ef84780ae8be240e55349a3f298e9b401a62575e47eca6d6b9d7c09527cb7ba"
+  }
+}
