@@ -17,7 +17,6 @@ from src.ml_prediction import MINIMUM_HISTORY_ORDERS
 
 HISTORY_PATH = PROJECT_ROOT / "data" / "user_order_history.csv"
 RESTAURANT_PATH = PROJECT_ROOT / "data" / "swiggy_cleaned_sample_expanded.csv"
-TAXONOMY_PATH = PROJECT_ROOT / "data" / "cuisine_taxonomy.csv"
 
 RESTRICTION_OPTIONS = {
     "Lactose intolerant": "Lactose intolerance",
@@ -31,6 +30,9 @@ ALLERGY_OPTIONS = {
     "Egg allergy": "Egg allergy",
     "Soy allergy": "Soy allergy",
 }
+
+MINIMUM_ONBOARDING_DISHES = 5
+MAX_ONBOARDING_CUISINES = 30
 
 
 st.set_page_config(
@@ -77,18 +79,40 @@ def load_order_history():
 
 
 @st.cache_data
-def load_locations():
-    """Load only the two columns needed to draw the location controls."""
+def load_onboarding_dishes():
+    """Load the lightweight columns needed for onboarding controls."""
     return pd.read_csv(
         RESTAURANT_PATH,
-        usecols=["city", "locality"],
+        usecols=["city", "locality", "cuisine", "dish_price", "veg_nonveg"],
         low_memory=False,
     )
 
 
-@st.cache_data
-def load_cuisines():
-    return sorted(pd.read_csv(TAXONOMY_PATH)["cuisine"].dropna().astype(str).unique())
+def available_cuisines(dishes, city, locality, budget, food_preference):
+    """Return cuisines that have at least one dish matching current hard constraints."""
+    dietary_value = "Veg" if food_preference == "Vegetarian" else "Non-veg"
+    candidates = dishes[
+        (dishes["city"] == city)
+        & (dishes["dish_price"] <= budget)
+        & (dishes["veg_nonveg"] == dietary_value)
+    ]
+    if locality:
+        candidates = candidates[candidates["locality"] == locality]
+
+    cuisine_counts = (
+        candidates["cuisine"]
+        .dropna()
+        .astype(str)
+        .str.split(",")
+        .explode()
+        .str.strip()
+        .loc[lambda values: values.ne("")]
+        .value_counts()
+    )
+    robust_cuisines = cuisine_counts[cuisine_counts >= MINIMUM_ONBOARDING_DISHES]
+    if robust_cuisines.empty:
+        robust_cuisines = cuisine_counts
+    return robust_cuisines.head(MAX_ONBOARDING_CUISINES).index.tolist()
 
 
 def most_common(values):
@@ -219,8 +243,7 @@ def display_candidate(candidate):
 
 
 history = load_order_history()
-locations = load_locations()
-cuisine_list = load_cuisines()
+onboarding_dishes = load_onboarding_dishes()
 
 st.title("Intelligent Culinary Matchmaker")
 st.caption("Personalized, grounded meal recommendations from real restaurant dishes")
@@ -234,11 +257,11 @@ with status_column:
         "User status", ["New user", "Returning user"], horizontal=True
     )
 
-city_list = sorted(locations["city"].dropna().astype(str).unique())
+city_list = sorted(onboarding_dishes["city"].dropna().astype(str).unique())
 with city_column:
     city = st.selectbox("City", city_list)
 
-city_rows = locations[locations["city"] == city]
+city_rows = onboarding_dishes[onboarding_dishes["city"] == city]
 locality_list = sorted(
     locality for locality in city_rows["locality"].dropna().astype(str).unique()
     if locality.strip()
@@ -272,18 +295,6 @@ if user_status == "Returning user":
         )
 
 history_eligible = order_count >= MINIMUM_HISTORY_ORDERS
-preferred_cuisines = []
-if not history_eligible:
-    preferred_cuisines = st.multiselect(
-        "Preferred cuisines",
-        cuisine_list,
-        max_selections=3,
-        help="Choose cuisines for cold-start recommendations until enough order history exists.",
-    )
-    st.caption(
-        f"Onboarding preferences are used until the user has at least "
-        f"{MINIMUM_HISTORY_ORDERS} previous orders."
-    )
 
 meal_column, diet_column, spice_column = st.columns(3)
 with meal_column:
@@ -317,8 +328,32 @@ with budget_input:
         step=25, disabled=not use_explicit_budget,
     )
 
+preferred_cuisines = []
+available_onboarding_cuisines = []
+if not history_eligible:
+    available_onboarding_cuisines = available_cuisines(
+        onboarding_dishes, city, locality, float(budget), food_preference
+    )
+    preferred_cuisines = st.multiselect(
+        "Preferred cuisines available for these choices",
+        available_onboarding_cuisines,
+        max_selections=2,
+        help="Choose a primary cuisine and, optionally, one fallback cuisine.",
+    )
+    if available_onboarding_cuisines:
+        st.caption(
+            f"Only cuisines backed by real matching dishes are shown, with at least "
+            f"{MINIMUM_ONBOARDING_DISHES} matches when available. Onboarding is used "
+            f"until the user has {MINIMUM_HISTORY_ORDERS} previous orders."
+        )
+    else:
+        st.warning(
+            "No cuisines have dishes matching this location, food preference, and budget."
+        )
+
 if st.button(
-    "Find My Meal", icon=":material/search:", type="primary", use_container_width=True
+    "Find My Meal", icon=":material/search:", type="primary", use_container_width=True,
+    disabled=not history_eligible and not available_onboarding_cuisines,
 ):
     if "Vegan" in restrictions and food_preference != "Vegetarian":
         st.error("Select Vegetarian when using the Vegan restriction.")

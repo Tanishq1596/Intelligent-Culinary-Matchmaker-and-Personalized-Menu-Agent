@@ -14,6 +14,7 @@ The project is designed around one important boundary: **the LLM explains recomm
 ## What The System Does
 
 - Supports every new user through preferred-cuisine onboarding.
+- Shows cold-start cuisines only when matching dishes exist for the selected location, diet, and budget.
 - Predicts a returning user's cuisine preference across 82 cuisine/category classes after three orders.
 - Estimates expected order value when the user does not provide a budget.
 - Filters real dishes by city, optional locality, cuisine, budget, and veg/non-veg preference.
@@ -187,7 +188,7 @@ The model-development notebooks are intentionally readable and interview-oriente
 ## Key Engineering Decisions
 
 1. **Hard constraints are deterministic.** Budget, city, locality, and food preference are handled by Pandas rather than inferred by an LLM.
-2. **Cold start is explicit.** New users select cuisines and a budget instead of receiving an unreliable model prediction without history.
+2. **Cold start is explicit and grounded.** New users select cuisines and a budget instead of receiving an unreliable model prediction without history; cuisine options are ranked from matching restaurant rows and normally require at least five available dishes.
 3. **Identity is not predictive.** User IDs group orders but never enter the classifier, allowing behavior to generalize to unseen users.
 4. **Explicit budget wins.** The regressor is used only when a returning user has not supplied a maximum budget.
 5. **Retrieval is confidence-aware.** Exact dish matches are preferred; semantic matches must pass a distance threshold.
