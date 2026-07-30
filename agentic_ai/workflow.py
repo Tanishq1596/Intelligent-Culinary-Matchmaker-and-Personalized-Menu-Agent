@@ -5,6 +5,7 @@ from typing import Any, NotRequired, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from LLM import generate_recommendation, prepare_llm_context
+from src.ml_prediction import MINIMUM_HISTORY_ORDERS
 from .request_parser import parse_user_request
 from .tools import (
     apply_safety_rules,
@@ -49,7 +50,7 @@ def parse_request_node(state):
 def classifier_input(preferences):
     features = dict(preferences.get("classifier_features", {}))
     feature_names = (
-        "user_id", "meal_time", "day_type", "vegetarian",
+        "meal_time", "day_type", "vegetarian",
         "average_previous_rating", "most_ordered_cuisine", "order_frequency",
         "spice_preference", "previous_cuisine_orders",
     )
@@ -72,8 +73,9 @@ def predict_cuisine_node(state):
     preferences = state["parsed_preferences"]
     features = classifier_input(preferences)
 
-    if int(features.get("order_frequency", 0)) >= 1:
+    if int(features.get("order_frequency", 0)) >= MINIMUM_HISTORY_ORDERS:
         predictions = predict_cuisines.invoke({"user_features": features})
+        prediction_source = "history_model"
     else:
         preferred = preferences.get("preferred_cuisines", [])
         if isinstance(preferred, str):
@@ -85,6 +87,7 @@ def predict_cuisine_node(state):
             raise ValueError(
                 "Cuisine prediction needs returning-user history or onboarding cuisines"
             )
+        prediction_source = "onboarding"
 
     primary = predictions[0]
     secondary = predictions[1] if len(predictions) > 1 else None
@@ -94,12 +97,18 @@ def predict_cuisine_node(state):
             "secondary": secondary,
             "selected": primary,
             "predictions": predictions[:3],
+            "source": prediction_source,
         }
     }
 
 
 def budget_route(state):
-    return "user" if state["parsed_preferences"].get("user_budget") is not None else "predict"
+    preferences = state["parsed_preferences"]
+    if preferences.get("user_budget") is not None:
+        return "user"
+    if preferences.get("spending_features"):
+        return "predict"
+    raise ValueError("New users must provide an explicit budget")
 
 
 def use_user_budget_node(state):

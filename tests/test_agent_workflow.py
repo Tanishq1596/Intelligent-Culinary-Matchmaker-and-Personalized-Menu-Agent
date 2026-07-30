@@ -21,7 +21,6 @@ from agentic_ai.workflow import (
 
 PROFILE = {
     "classifier_features": {
-        "user_id": "U00042",
         "meal_time": "Dinner",
         "day_type": "Weekend",
         "vegetarian": "Yes",
@@ -59,6 +58,7 @@ def main():
 
     assert result["final_budget"] == 250
     assert result["predicted_cuisine"]["primary"]["cuisine"] == "North Indian"
+    assert result["predicted_cuisine"]["source"] == "history_model"
     assert len(result["filtered_candidates"]) <= 10
     assert result["rag_results"]
     assert result["safety_results"]
@@ -88,6 +88,7 @@ def main():
     assert not no_match["rag_results"]
     assert no_match["error_message"] == NO_MATCH_MESSAGE
     assert no_match["final_response"] == NO_MATCH_MESSAGE
+    assert no_match["predicted_cuisine"]["source"] == "onboarding"
     assert len(llm_contexts) == 1
 
     # The same fixed response is used when safety rejects every candidate.

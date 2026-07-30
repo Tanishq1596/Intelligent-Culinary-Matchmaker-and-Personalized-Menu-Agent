@@ -9,8 +9,8 @@ import joblib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = PROJECT_ROOT / "models"
+MINIMUM_HISTORY_ORDERS = 3
 REQUIRED_FEATURES = {
-    "user_id",
     "meal_time",
     "day_type",
     "vegetarian",
@@ -32,14 +32,14 @@ class CuisinePredictor:
         missing = REQUIRED_FEATURES - set(user_features)
         if missing:
             raise ValueError(f"Missing classifier features: {sorted(missing)}")
-        if int(user_features["order_frequency"]) < 1:
+        if int(user_features["order_frequency"]) < MINIMUM_HISTORY_ORDERS:
             raise ValueError(
-                "Cuisine classification requires at least one previous order; "
+                f"Cuisine classification requires at least {MINIMUM_HISTORY_ORDERS} "
+                "previous orders; "
                 "use onboarding preferences for cold-start users."
             )
 
         prepared = {
-            "user_id": str(user_features["user_id"]),
             "meal_time": str(user_features["meal_time"]),
             "day_type": str(user_features["day_type"]),
             "vegetarian": str(user_features["vegetarian"]),

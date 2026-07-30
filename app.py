@@ -12,8 +12,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.ml_prediction import MINIMUM_HISTORY_ORDERS
+
+
 HISTORY_PATH = PROJECT_ROOT / "data" / "user_order_history.csv"
 RESTAURANT_PATH = PROJECT_ROOT / "data" / "swiggy_cleaned_sample_expanded.csv"
+TAXONOMY_PATH = PROJECT_ROOT / "data" / "cuisine_taxonomy.csv"
 
 RESTRICTION_OPTIONS = {
     "Lactose intolerant": "Lactose intolerance",
@@ -82,6 +86,11 @@ def load_locations():
     )
 
 
+@st.cache_data
+def load_cuisines():
+    return sorted(pd.read_csv(TAXONOMY_PATH)["cuisine"].dropna().astype(str).unique())
+
+
 def most_common(values):
     """Return the most frequent non-empty value."""
     cleaned = [str(value) for value in values if pd.notna(value) and str(value).strip()]
@@ -89,13 +98,14 @@ def most_common(values):
 
 
 def build_user_profile(
-    history, user_id, city, locality, meal_time, food_preference,
-    spice_preference, restrictions, allergies, user_budget,
+    history, user_id, preferred_cuisines, city, locality, meal_time,
+    food_preference, spice_preference, restrictions, allergies, user_budget,
 ):
-    """Convert one returning user's history and current choices into model inputs."""
-    user_orders = history[history["user_id"] == user_id]
-    favourite_cuisine = most_common(user_orders["ordered_cuisine"])
-    cuisine_orders = int((user_orders["ordered_cuisine"] == favourite_cuisine).sum())
+    """Build either a history-based profile or a cold-start onboarding profile."""
+    user_orders = (
+        history[history["user_id"] == user_id]
+        if user_id else history.iloc[0:0]
+    )
     order_count = len(user_orders)
     day_type = "Weekend" if datetime.now().weekday() >= 5 else "Weekday"
 
@@ -105,7 +115,7 @@ def build_user_profile(
         ALLERGY_OPTIONS[item] for item in allergies
     ]
 
-    return {
+    profile = {
         "city": city,
         "locality": locality,
         "meal_time": meal_time,
@@ -113,8 +123,18 @@ def build_user_profile(
         "spice_preference": spice_preference,
         "restrictions": selected_restrictions,
         "user_budget": user_budget,
+    }
+
+    if order_count < MINIMUM_HISTORY_ORDERS:
+        profile["preferred_cuisines"] = preferred_cuisines
+        profile["personalization_mode"] = "onboarding"
+        return profile
+
+    favourite_cuisine = most_common(user_orders["ordered_cuisine"])
+    cuisine_orders = int((user_orders["ordered_cuisine"] == favourite_cuisine).sum())
+    profile.update({
+        "personalization_mode": "history_model",
         "classifier_features": {
-            "user_id": user_id,
             "meal_time": meal_time,
             "day_type": day_type,
             "vegetarian": "Yes" if food_preference == "Vegetarian" else "No",
@@ -133,7 +153,8 @@ def build_user_profile(
             "previous_order_count": order_count,
             "preferred_cuisine": favourite_cuisine,
         },
-    }
+    })
+    return profile
 
 
 def run_recommendation(profile):
@@ -147,11 +168,14 @@ def run_recommendation(profile):
 
     result = run_workflow(f"Find a suitable meal in {location_text}.", profile)
 
-    spending_features = dict(profile["spending_features"])
-    spending_features["preferred_cuisine"] = result["predicted_cuisine"]["primary"]["cuisine"]
-    result["predicted_order_value"] = get_spending_predictor().predict_expected_order_value(
-        spending_features
-    )
+    if profile.get("spending_features"):
+        spending_features = dict(profile["spending_features"])
+        spending_features["preferred_cuisine"] = result["predicted_cuisine"]["primary"]["cuisine"]
+        result["predicted_order_value"] = get_spending_predictor().predict_expected_order_value(
+            spending_features
+        )
+    else:
+        result["predicted_order_value"] = None
     return result
 
 
@@ -196,6 +220,7 @@ def display_candidate(candidate):
 
 history = load_order_history()
 locations = load_locations()
+cuisine_list = load_cuisines()
 
 st.title("Intelligent Culinary Matchmaker")
 st.caption("Personalized, grounded meal recommendations from real restaurant dishes")
@@ -203,9 +228,11 @@ st.caption("Personalized, grounded meal recommendations from real restaurant dis
 st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
 st.subheader("User Profile")
 
-profile_column, city_column, locality_column = st.columns([1.2, 1, 1.4])
-with profile_column:
-    user_id = st.selectbox("Order-history profile", sorted(history["user_id"].unique()))
+status_column, city_column, locality_column = st.columns([1.2, 1, 1.4])
+with status_column:
+    user_status = st.radio(
+        "User status", ["New user", "Returning user"], horizontal=True
+    )
 
 city_list = sorted(locations["city"].dropna().astype(str).unique())
 with city_column:
@@ -230,6 +257,34 @@ locality = None if locality_choice == "Any locality" else locality_choice
 if not locality_list:
     locality = None
 
+user_id = None
+order_count = 0
+if user_status == "Returning user":
+    user_id = st.selectbox(
+        "Order-history profile",
+        sorted(history["user_id"].unique()),
+        help="These synthetic profiles demonstrate returning-user personalization.",
+    )
+    order_count = int((history["user_id"] == user_id).sum())
+    if order_count >= MINIMUM_HISTORY_ORDERS:
+        st.caption(
+            f"{order_count} previous orders found. ML personalization will be used."
+        )
+
+history_eligible = order_count >= MINIMUM_HISTORY_ORDERS
+preferred_cuisines = []
+if not history_eligible:
+    preferred_cuisines = st.multiselect(
+        "Preferred cuisines",
+        cuisine_list,
+        max_selections=3,
+        help="Choose cuisines for cold-start recommendations until enough order history exists.",
+    )
+    st.caption(
+        f"Onboarding preferences are used until the user has at least "
+        f"{MINIMUM_HISTORY_ORDERS} previous orders."
+    )
+
 meal_column, diet_column, spice_column = st.columns(3)
 with meal_column:
     meal_label = st.selectbox("Meal time", ["Breakfast", "Lunch", "Snacks", "Dinner"])
@@ -251,7 +306,11 @@ with allergy_column:
 
 budget_toggle, budget_input = st.columns([1, 2])
 with budget_toggle:
-    use_explicit_budget = st.toggle("Set my own maximum budget", value=True)
+    if history_eligible:
+        use_explicit_budget = st.toggle("Set my own maximum budget", value=True)
+    else:
+        use_explicit_budget = True
+        st.markdown("**Explicit budget required for new users**")
 with budget_input:
     budget = st.number_input(
         "Maximum budget (₹)", min_value=50, max_value=2000, value=250,
@@ -263,10 +322,13 @@ if st.button(
 ):
     if "Vegan" in restrictions and food_preference != "Vegetarian":
         st.error("Select Vegetarian when using the Vegan restriction.")
+    elif not history_eligible and not preferred_cuisines:
+        st.error("Select at least one preferred cuisine for a new user.")
     else:
         profile = build_user_profile(
             history=history,
             user_id=user_id,
+            preferred_cuisines=preferred_cuisines,
             city=city,
             locality=locality,
             meal_time=meal_time,
@@ -287,15 +349,24 @@ if st.button(
 result = st.session_state.get("recommendation_result")
 if result:
     st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
-    st.subheader("ML Predictions")
+    st.subheader("Personalization Results")
 
     primary_cuisine = result["predicted_cuisine"]["primary"]
     selected_cuisine = result["predicted_cuisine"]["selected"]
+    prediction_source = result["predicted_cuisine"]["source"]
     prediction_column, spending_column, budget_column = st.columns(3)
-    prediction_column.metric("Top predicted cuisine", primary_cuisine["cuisine"])
-    spending_column.metric(
-        "Expected order value", f"₹{result['predicted_order_value']:.0f}"
+    cuisine_label = (
+        "Top predicted cuisine"
+        if prediction_source == "history_model"
+        else "Onboarding cuisine"
     )
+    prediction_column.metric(cuisine_label, primary_cuisine["cuisine"])
+    if result["predicted_order_value"] is not None:
+        spending_column.metric(
+            "Expected order value", f"₹{result['predicted_order_value']:.0f}"
+        )
+    else:
+        spending_column.metric("Expected order value", "Not estimated", "Cold start")
     budget_source = "User limit" if result["parsed_preferences"].get("user_budget") else "Model estimate"
     budget_column.metric("Applied budget", f"₹{result['final_budget']:.0f}", budget_source)
 
@@ -310,9 +381,10 @@ if result:
         st.bar_chart(chart_data, x="Cuisine", y="Probability", color="#2d7657")
 
     if selected_cuisine["cuisine"] != primary_cuisine["cuisine"]:
+        cuisine_source = "prediction" if prediction_source == "history_model" else "preference"
         st.info(
-            f"No matching dishes were found for the top prediction, "
-            f"{primary_cuisine['cuisine']}. The workflow used the second prediction, "
+            f"No matching dishes were found for the top {cuisine_source}, "
+            f"{primary_cuisine['cuisine']}. The workflow used the second {cuisine_source}, "
             f"{selected_cuisine['cuisine']}, for restaurant recommendations."
         )
 
@@ -339,10 +411,20 @@ if result:
         st.warning(result["final_response"])
 
     with st.expander("How was this recommendation generated?"):
+        first_step = (
+            "The classifier predicted cuisine preference from behavioral order history."
+            if prediction_source == "history_model"
+            else "The selected onboarding cuisines handled the new-user cold start."
+        )
+        second_step = (
+            "The regressor estimated expected order value when no explicit budget was supplied."
+            if result["parsed_preferences"].get("user_budget") is None
+            else "The user's explicit budget remained the hard price limit."
+        )
         st.markdown(
-            """
-            1. The classifier predicted cuisine preference from previous orders and the current meal context.
-            2. The regressor estimated the expected order value; an explicit user budget remained the hard limit.
+            f"""
+            1. {first_step}
+            2. {second_step}
             3. Pandas selected real dishes matching city, locality, cuisine, price, and food preference.
             4. RAG retrieved common ingredients and allergens from the culinary knowledge base.
             5. Deterministic safety rules rejected known conflicts and marked uncertain recipes with warnings.
