@@ -5,18 +5,18 @@
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-1C3C3C)](https://www.langchain.com/langgraph)
 [![scikit-learn](https://img.shields.io/badge/ML-scikit--learn-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
 
-An end-to-end culinary recommendation system that predicts cuisine preference and expected spending, retrieves real restaurant dishes, enriches them with culinary knowledge, applies deterministic dietary safety rules, and asks Gemini to explain only validated recommendations.
+An end-to-end culinary recommendation system that predicts cuisine preference, filters real restaurant dishes using the user's explicit budget, enriches them with culinary knowledge, applies deterministic dietary safety rules, and asks Gemini to explain only validated recommendations.
 
 The project is designed around one important boundary: **the LLM explains recommendations, but it never decides allergy or dietary safety.**
 
-![Completed Streamlit recommendation](docs/screenshots/streamlit-recommendation.png)
+![Streamlit user profile](docs/screenshots/streamlit-profile.png)
 
 ## What The System Does
 
 - Supports every new user through preferred-cuisine onboarding.
 - Shows cold-start cuisines only when matching dishes exist for the selected location, diet, and budget.
 - Predicts a returning user's cuisine preference across 82 cuisine/category classes after three orders.
-- Estimates expected order value when the user does not provide a budget.
+- Uses the user's explicit maximum budget as a hard price limit.
 - Filters real dishes by city, optional locality, cuisine, budget, and veg/non-veg preference.
 - Retrieves ingredients, allergens, substitutions, and preparation knowledge using exact matching plus semantic RAG.
 - Applies deterministic rules for lactose intolerance, vegan/vegetarian diets, gluten sensitivity, and peanut, tree-nut, egg, and soy allergies.
@@ -31,13 +31,9 @@ flowchart TD
     A[Streamlit user profile] --> U{At least 3 prior orders?}
     U -->|Yes| B[Cuisine classifier]
     U -->|No| O[Onboarding cuisine preferences]
-    A --> C{Explicit budget?}
-    C -->|Yes| D[Use user limit]
-    C -->|No| E[Spending regressor]
-    B --> F[Pandas restaurant filter]
-    O --> F
+    B --> D[Use explicit user budget]
+    O --> D
     D --> F
-    E --> F
     F --> G[Exact-first ChromaDB RAG]
     G --> H[Deterministic safety rules]
     H --> I{Valid candidates?}
@@ -51,7 +47,6 @@ flowchart TD
 | Component | Responsibility |
 | --- | --- |
 | Cuisine classifier | Predict likely cuisine classes and probabilities |
-| Spending regressor | Estimate expected order value when no budget is supplied |
 | Pandas filter | Enforce location, price, cuisine, and food-preference constraints |
 | RAG | Retrieve common recipe knowledge for shortlisted dishes |
 | Safety engine | Detect known conflicts and assign deterministic safety states |
@@ -63,11 +58,10 @@ flowchart TD
 | Subsystem | Selected approach | Evaluation result |
 | --- | --- | --- |
 | Cuisine classification | Logistic Regression | 90.69% untouched-test accuracy across 82 classes and unseen users |
-| Spending regression | Histogram Gradient Boosting | MAE INR 28.60, RMSE INR 39.21, R2 0.8320 |
 | Semantic RAG | all-MiniLM-L6-v2 + ChromaDB | Precision@1 86.67%, Recall@3 93.33%, MRR 0.90 |
 | Unknown-query rejection | Distance threshold 0.35 | 0% false acceptance on the labeled unknown-query set |
 
-The classification notebook compares 12 classifier families, including logistic regression, linear and RBF SVM, Naive Bayes, random forests, Extra Trees, KNN, and XGBoost. `user_id` is used only to group historical orders and keep users isolated across train, validation, and test splits; it is never encoded as a model feature. The regression notebook compares 16 regression models. Model selection uses validation data; final metrics are reported on untouched test data.
+The classification notebook compares 12 classifier families, including logistic regression, linear and RBF SVM, Naive Bayes, random forests, Extra Trees, KNN, and XGBoost. `user_id` is used only to group historical orders and keep users isolated across train, validation, and test splits; it is never encoded as a model feature. Model selection uses validation data; final metrics are reported on untouched test data.
 
 ## Data Snapshot
 
@@ -77,7 +71,7 @@ The classification notebook compares 12 classifier families, including logistic 
 | Restaurants represented | 8,348 | Restaurant-level candidate retrieval |
 | Indian cities represented | 10 | City and available-locality filtering |
 | Culinary knowledge base | 1,000 dishes | Ingredients, allergens, tags, substitutions, and RAG |
-| Synthetic order history | 40,000 orders / 5,000 users | Classification and regression training |
+| Synthetic order history | 40,000 orders / 5,000 users | Cuisine-classification training |
 
 The 5,000 synthetic users are training examples, not an application allowlist. Unseen users receive onboarding recommendations immediately and automatically become eligible for ML personalization when at least three historical orders are available. The final dish dataset is deduplicated by `restaurant_id + normalized_dish_name`.
 
@@ -108,7 +102,6 @@ Only likely-compatible and warning candidates may reach Gemini. Rejected and unk
 |   `-- evaluate_rag.py
 |-- src/
 |   |-- ml_prediction.py
-|   |-- spending_prediction.py
 |   |-- dish_filter.py
 |   `-- safety_rules.py
 |-- notebooks/                     # Readable model-development workflows
@@ -168,7 +161,6 @@ Run the focused checks from the repository root:
 
 ```powershell
 python tests/test_ml_prediction.py
-python tests/test_spending_prediction.py
 python tests/test_safety_rules.py
 python tests/test_agent_workflow.py
 ```
@@ -182,7 +174,6 @@ python rag/evaluate_rag.py
 The model-development notebooks are intentionally readable and interview-oriented:
 
 - `notebooks/cuisine_classification_model.ipynb`
-- `notebooks/spending_regression_model.ipynb`
 - `notebooks/dish_filtering.ipynb`
 
 ## Key Engineering Decisions
@@ -190,7 +181,7 @@ The model-development notebooks are intentionally readable and interview-oriente
 1. **Hard constraints are deterministic.** Budget, city, locality, and food preference are handled by Pandas rather than inferred by an LLM.
 2. **Cold start is explicit and grounded.** New users select cuisines and a budget instead of receiving an unreliable model prediction without history; cuisine options are ranked from matching restaurant rows and normally require at least five available dishes.
 3. **Identity is not predictive.** User IDs group orders but never enter the classifier, allowing behavior to generalize to unseen users.
-4. **Explicit budget wins.** The regressor is used only when a returning user has not supplied a maximum budget.
+4. **Budget is explicit.** Every user supplies a maximum budget, which remains the hard price limit throughout the workflow.
 5. **Retrieval is confidence-aware.** Exact dish matches are preferred; semantic matches must pass a distance threshold.
 6. **Fallbacks remain controlled.** The workflow can try the second predicted cuisine but never relaxes dietary restrictions or silently raises the budget.
 7. **Generation is grounded.** Gemini receives a compact context containing only validated dishes, restaurant names, prices, ingredients, conflicts, and known substitutions.
@@ -202,10 +193,6 @@ The model-development notebooks are intentionally readable and interview-oriente
 - Ingredient records describe common recipes, not restaurant-confirmed formulations.
 - The training history is synthetic; production returning-user personalization would read order events from an authenticated application database.
 - Some restaurant ratings and locality fields are unavailable in the source data.
-
-## Application Preview
-
-![Streamlit user profile](docs/screenshots/streamlit-profile.png)
 
 ## Disclaimer
 

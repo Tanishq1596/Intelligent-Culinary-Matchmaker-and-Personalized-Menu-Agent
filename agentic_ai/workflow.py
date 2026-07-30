@@ -12,7 +12,6 @@ from .tools import (
     filter_restaurant_dishes,
     get_catalog,
     predict_cuisines,
-    predict_spending_limit,
     retrieve_dish_knowledge,
 )
 
@@ -102,42 +101,15 @@ def predict_cuisine_node(state):
     }
 
 
-def budget_route(state):
-    preferences = state["parsed_preferences"]
-    if preferences.get("user_budget") is not None:
-        return "user"
-    if preferences.get("spending_features"):
-        return "predict"
-    raise ValueError("New users must provide an explicit budget")
-
-
 def use_user_budget_node(state):
-    budget = float(state["parsed_preferences"]["user_budget"])
+    user_budget = state["parsed_preferences"].get("user_budget")
+    if user_budget is None:
+        raise ValueError("A maximum budget is required")
+
+    budget = float(user_budget)
     if budget <= 0:
         raise ValueError("User budget must be positive")
     return {"final_budget": budget}
-
-
-def spending_input(state):
-    preferences = state["parsed_preferences"]
-    context = dict(preferences.get("spending_features", {}))
-    feature_names = (
-        "user_average_order_value", "meal_time", "weekday_or_weekend",
-        "location", "payment_method", "previous_order_count", "preferred_cuisine",
-    )
-    for name in feature_names:
-        if name in preferences:
-            context[name] = preferences[name]
-
-    context["meal_time"] = preferences.get("meal_time", context.get("meal_time"))
-    context["location"] = preferences["city"]
-    context["preferred_cuisine"] = state["predicted_cuisine"]["primary"]["cuisine"]
-    return context
-
-
-def predict_budget_node(state):
-    budget = predict_spending_limit.invoke({"user_context": spending_input(state)})
-    return {"final_budget": float(budget)}
 
 
 def filter_for_cuisine(state, cuisine):
@@ -298,7 +270,6 @@ def build_workflow(llm_generator=None):
     graph.add_node("parse_request", parse_request_node)
     graph.add_node("predict_cuisine", predict_cuisine_node)
     graph.add_node("use_user_budget", use_user_budget_node)
-    graph.add_node("predict_budget", predict_budget_node)
     graph.add_node("filter_dishes", filter_dishes_node)
     graph.add_node("try_second_cuisine", try_second_cuisine_node)
     graph.add_node("retrieve_ingredients", retrieve_ingredients_node)
@@ -311,12 +282,8 @@ def build_workflow(llm_generator=None):
 
     graph.add_edge(START, "parse_request")
     graph.add_edge("parse_request", "predict_cuisine")
-    graph.add_conditional_edges(
-        "predict_cuisine", budget_route,
-        {"user": "use_user_budget", "predict": "predict_budget"},
-    )
+    graph.add_edge("predict_cuisine", "use_user_budget")
     graph.add_edge("use_user_budget", "filter_dishes")
-    graph.add_edge("predict_budget", "filter_dishes")
     graph.add_conditional_edges(
         "filter_dishes", no_candidate_check,
         {"continue": "retrieve_ingredients", "fallback": "try_second_cuisine"},

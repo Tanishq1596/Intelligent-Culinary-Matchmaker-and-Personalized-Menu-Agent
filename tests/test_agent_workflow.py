@@ -15,6 +15,7 @@ from LLM.llm_generator import (
 from agentic_ai.workflow import (
     NO_MATCH_MESSAGE,
     no_match_response_node,
+    use_user_budget_node,
     validated_candidate_check,
 )
 
@@ -30,20 +31,18 @@ PROFILE = {
         "spice_preference": "Hot",
         "previous_cuisine_orders": 9,
     },
-    "spending_features": {
-        "user_average_order_value": 240,
-        "meal_time": "Dinner",
-        "weekday_or_weekend": "Weekend",
-        "location": "Bengaluru",
-        "payment_method": "UPI",
-        "previous_order_count": 12,
-        "preferred_cuisine": "North Indian",
-    },
 }
 
 
 def main():
     llm_contexts = []
+
+    try:
+        use_user_budget_node({"parsed_preferences": {}})
+    except ValueError as error:
+        assert "maximum budget" in str(error)
+    else:
+        raise AssertionError("The workflow must require an explicit budget")
 
     def fake_llm(context):
         llm_contexts.append(context)

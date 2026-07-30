@@ -168,39 +168,19 @@ def build_user_profile(
             "spice_preference": spice_preference,
             "previous_cuisine_orders": cuisine_orders,
         },
-        "spending_features": {
-            "user_average_order_value": float(user_orders["order_amount"].mean()),
-            "meal_time": meal_time,
-            "weekday_or_weekend": day_type,
-            "location": city,
-            "payment_method": most_common(user_orders["payment_method"]),
-            "previous_order_count": order_count,
-            "preferred_cuisine": favourite_cuisine,
-        },
     })
     return profile
 
 
 def run_recommendation(profile):
-    """Run the complete agent workflow and add the regressor's raw estimate for display."""
+    """Run the complete recommendation workflow."""
     from agentic_ai import run_workflow
-    from agentic_ai.tools import get_spending_predictor
 
     location_text = profile["city"]
     if profile.get("locality"):
         location_text = f"{profile['locality']}, {profile['city']}"
 
-    result = run_workflow(f"Find a suitable meal in {location_text}.", profile)
-
-    if profile.get("spending_features"):
-        spending_features = dict(profile["spending_features"])
-        spending_features["preferred_cuisine"] = result["predicted_cuisine"]["primary"]["cuisine"]
-        result["predicted_order_value"] = get_spending_predictor().predict_expected_order_value(
-            spending_features
-        )
-    else:
-        result["predicted_order_value"] = None
-    return result
+    return run_workflow(f"Find a suitable meal in {location_text}.", profile)
 
 
 def display_safety(candidate):
@@ -315,18 +295,9 @@ with restriction_column:
 with allergy_column:
     allergies = st.multiselect("Allergies", list(ALLERGY_OPTIONS))
 
-budget_toggle, budget_input = st.columns([1, 2])
-with budget_toggle:
-    if history_eligible:
-        use_explicit_budget = st.toggle("Set my own maximum budget", value=True)
-    else:
-        use_explicit_budget = True
-        st.markdown("**Explicit budget required for new users**")
-with budget_input:
-    budget = st.number_input(
-        "Maximum budget (₹)", min_value=50, max_value=2000, value=250,
-        step=25, disabled=not use_explicit_budget,
-    )
+budget = st.number_input(
+    "Maximum budget (₹)", min_value=50, max_value=2000, value=250, step=25,
+)
 
 preferred_cuisines = []
 available_onboarding_cuisines = []
@@ -371,7 +342,7 @@ if st.button(
             spice_preference=spice_preference,
             restrictions=restrictions,
             allergies=allergies,
-            user_budget=float(budget) if use_explicit_budget else None,
+            user_budget=float(budget),
         )
         try:
             with st.spinner("Finding compatible dishes..."):
@@ -389,21 +360,14 @@ if result:
     primary_cuisine = result["predicted_cuisine"]["primary"]
     selected_cuisine = result["predicted_cuisine"]["selected"]
     prediction_source = result["predicted_cuisine"]["source"]
-    prediction_column, spending_column, budget_column = st.columns(3)
+    prediction_column, budget_column = st.columns(2)
     cuisine_label = (
         "Top predicted cuisine"
         if prediction_source == "history_model"
         else "Onboarding cuisine"
     )
     prediction_column.metric(cuisine_label, primary_cuisine["cuisine"])
-    if result["predicted_order_value"] is not None:
-        spending_column.metric(
-            "Expected order value", f"₹{result['predicted_order_value']:.0f}"
-        )
-    else:
-        spending_column.metric("Expected order value", "Not estimated", "Cold start")
-    budget_source = "User limit" if result["parsed_preferences"].get("user_budget") else "Model estimate"
-    budget_column.metric("Applied budget", f"₹{result['final_budget']:.0f}", budget_source)
+    budget_column.metric("Maximum budget", f"₹{result['final_budget']:.0f}", "User limit")
 
     probabilities = result["predicted_cuisine"].get("predictions", [])
     probability_rows = [row for row in probabilities if row.get("probability") is not None]
@@ -451,15 +415,10 @@ if result:
             if prediction_source == "history_model"
             else "The selected onboarding cuisines handled the new-user cold start."
         )
-        second_step = (
-            "The regressor estimated expected order value when no explicit budget was supplied."
-            if result["parsed_preferences"].get("user_budget") is None
-            else "The user's explicit budget remained the hard price limit."
-        )
         st.markdown(
             f"""
             1. {first_step}
-            2. {second_step}
+            2. The user's explicit budget remained the hard price limit.
             3. Pandas selected real dishes matching city, locality, cuisine, price, and food preference.
             4. RAG retrieved common ingredients and allergens from the culinary knowledge base.
             5. Deterministic safety rules rejected known conflicts and marked uncertain recipes with warnings.
