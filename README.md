@@ -61,7 +61,7 @@ flowchart TD
 | Semantic RAG | all-MiniLM-L6-v2 + ChromaDB | Precision@1 86.67%, Recall@3 93.33%, MRR 0.90 |
 | Unknown-query rejection | Distance threshold 0.35 | 0% false acceptance on the labeled unknown-query set |
 
-The classification notebook compares 12 classifier families, including logistic regression, linear and RBF SVM, Naive Bayes, random forests, Extra Trees, KNN, and XGBoost. `user_id` is used only to group historical orders and keep users isolated across train, validation, and test splits; it is never encoded as a model feature. Model selection uses validation data; final metrics are reported on untouched test data.
+The classification notebook compares 10 classifier families, including logistic regression, linear and RBF SVM, Naive Bayes, random forest, KNN, and XGBoost. `user_id` is used only to group historical orders and keep users isolated across train, validation, and test splits; it is never encoded as a model feature. Model selection uses validation data; final metrics are reported on untouched test data.
 
 ## Data Snapshot
 
