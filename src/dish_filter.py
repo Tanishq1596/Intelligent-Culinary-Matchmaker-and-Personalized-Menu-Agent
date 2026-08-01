@@ -38,9 +38,9 @@ def dietary_key(preference):
         return None
     key = text_key(preference).replace("_", "-")
     aliases = {
-        "veg": "veg", "vegetarian": "veg", "yes": "veg",
+        "veg": "veg", "vegetarian": "veg",
         "non-veg": "non-veg", "non veg": "non-veg",
-        "nonvegetarian": "non-veg", "non-vegetarian": "non-veg", "no": "non-veg",
+        "nonvegetarian": "non-veg", "non-vegetarian": "non-veg",
     }
     if key not in aliases:
         raise ValueError("dietary_preference must be Veg, Non-veg, or None")
