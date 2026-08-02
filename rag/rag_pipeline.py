@@ -60,25 +60,6 @@ def normalize_dish_name(dish_name):
     return " ".join(text.split())
 
 
-def prepare_query(dish_name):
-    normalized = normalize_dish_name(dish_name)
-    synonyms = [
-        replacement
-        for phrases, replacement in CULINARY_SYNONYMS
-        if any(phrase in normalized for phrase in phrases)
-    ]
-    alternatives = ", ".join(synonyms) if synonyms else "none"
-
-    return (
-        f"Dish: {dish_name}\n"
-        f"Indian dish-name equivalents: {alternatives}\n"
-        f"Alternative dish terms: {alternatives}\n"
-        f"Canonical Indian dish terms: {alternatives}\n"
-        f"Description: {dish_name}\n"
-        f"Common ingredients or style: {dish_name}"
-    )
-
-
 def load_knowledge_base():
     dishes = pd.read_csv(DATA_PATH, keep_default_na=False, low_memory=False)
     dishes["normalized_dish_name"] = dishes["dish_name"].map(normalize_dish_name)
@@ -196,6 +177,25 @@ def cuisine_filter(cuisine):
     return {"cuisine": {"$in": cuisines}}
 
 
+def prepare_query(dish_name):
+    normalized = normalize_dish_name(dish_name)
+    synonyms = [
+        replacement
+        for phrases, replacement in CULINARY_SYNONYMS
+        if any(phrase in normalized for phrase in phrases)
+    ]
+    alternatives = ", ".join(synonyms) if synonyms else "none"
+
+    return (
+        f"Dish: {dish_name}\n"
+        f"Indian dish-name equivalents: {alternatives}\n"
+        f"Alternative dish terms: {alternatives}\n"
+        f"Canonical Indian dish terms: {alternatives}\n"
+        f"Description: {dish_name}\n"
+        f"Common ingredients or style: {dish_name}"
+    )
+
+
 def matched_result(requested_dish, normalized_query, row, match_type, distance):
     return {
         "requested_dish": requested_dish,
@@ -259,39 +259,18 @@ class CulinaryRAG:
         self.collection = get_chroma_client().get_collection(COLLECTION_NAME)
         self._embed_model = None
 
-    @property
-    def embed_model(self):
-        if self._embed_model is None:
-            self._embed_model = load_embedding_model()
-        return self._embed_model
-
-    def semantic_candidates(self, dish_name, cuisine=None, top_k=3):
-        dish_embedding = self.embed_model.encode(
-            [prepare_query(dish_name)],
-            normalize_embeddings=True,
-        )[0]
-
-        search_results = self.collection.query(
-            query_embeddings=[dish_embedding.tolist()],
-            n_results=top_k,
-            where=cuisine_filter(cuisine),
-            include=["metadatas", "distances"],
-        )
-
-        candidates = []
-        for dish_id, metadata, distance in zip(
-            search_results["ids"][0],
-            search_results["metadatas"][0],
-            search_results["distances"][0],
-        ):
-            candidates.append({
-                "dish_id": dish_id,
-                "dish_name": metadata["dish_name"],
-                "cuisine": metadata["cuisine"],
-                "distance": round(float(distance), 6),
-                "similarity": round(max(0.0, 1.0 - float(distance)), 6),
-            })
-        return candidates
+    # The agent passes all dishes shortlisted by Pandas filtering here.
+    def retrieve_many(self, candidates, top_k=3):
+        results = []
+        for candidate in candidates:
+            if isinstance(candidate, Mapping):
+                dish_name = candidate.get("dish_name", "")
+                cuisine = candidate.get("cuisine")
+            else:
+                dish_name = str(candidate)
+                cuisine = None
+            results.append(self.retrieve(dish_name, cuisine, top_k))
+        return results
 
     def retrieve(self, requested_dish, cuisine=None, top_k=3):
         normalized = normalize_dish_name(requested_dish)
@@ -323,17 +302,39 @@ class CulinaryRAG:
             distance,
         )
 
-    def retrieve_many(self, candidates, top_k=3):
-        results = []
-        for candidate in candidates:
-            if isinstance(candidate, Mapping):
-                dish_name = candidate.get("dish_name", "")
-                cuisine = candidate.get("cuisine")
-            else:
-                dish_name = str(candidate)
-                cuisine = None
-            results.append(self.retrieve(dish_name, cuisine, top_k))
-        return results
+    def semantic_candidates(self, dish_name, cuisine=None, top_k=3):
+        dish_embedding = self.embed_model.encode(
+            [prepare_query(dish_name)],
+            normalize_embeddings=True,
+        )[0]
+
+        search_results = self.collection.query(
+            query_embeddings=[dish_embedding.tolist()],
+            n_results=top_k,
+            where=cuisine_filter(cuisine),
+            include=["metadatas", "distances"],
+        )
+
+        candidates = []
+        for dish_id, metadata, distance in zip(
+            search_results["ids"][0],
+            search_results["metadatas"][0],
+            search_results["distances"][0],
+        ):
+            candidates.append({
+                "dish_id": dish_id,
+                "dish_name": metadata["dish_name"],
+                "cuisine": metadata["cuisine"],
+                "distance": round(float(distance), 6),
+                "similarity": round(max(0.0, 1.0 - float(distance)), 6),
+            })
+        return candidates
+
+    @property
+    def embed_model(self):
+        if self._embed_model is None:
+            self._embed_model = load_embedding_model()
+        return self._embed_model
 
 
 def main():
