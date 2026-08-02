@@ -56,7 +56,7 @@ def filter_restaurant_dishes(
 @tool
 def retrieve_dish_knowledge(candidates: list[dict]) -> list[dict]:
     """Retrieve structured culinary knowledge for shortlisted restaurant dishes."""
-    return [result.to_dict() for result in get_rag().retrieve_many(candidates)]
+    return get_rag().retrieve_many(candidates)
 
 
 @tool

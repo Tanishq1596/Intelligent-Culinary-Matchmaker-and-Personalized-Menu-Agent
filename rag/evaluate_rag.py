@@ -54,7 +54,7 @@ UNKNOWN_QUERIES = [
 def evaluate(rag: CulinaryRAG) -> dict:
     exact_rows = rag.frame.head(100).to_dict(orient="records")
     exact_hits = sum(
-        rag.retrieve(f"Special {row['dish_name']} Full 500 ml").matched_dish_id
+        rag.retrieve(f"Special {row['dish_name']} Full 500 ml")["matched_dish_id"]
         == str(row["dish_id"])
         for row in exact_rows
     )
@@ -72,17 +72,17 @@ def evaluate(rag: CulinaryRAG) -> dict:
         )
         result = rag.retrieve(query)
         ranks.append(rank)
-        if result.retrieval_status == "matched":
+        if result["retrieval_status"] == "matched":
             accepted_count += 1
-            accepted_correct += result.matched_dish in acceptable
+            accepted_correct += result["matched_dish"] in acceptable
         semantic_details.append(
             {
                 "query": query,
                 "top_3": names,
                 "relevant_rank": rank,
                 "top_distance": candidates[0]["distance"],
-                "retrieval_status": result.retrieval_status,
-                "accepted_dish": result.matched_dish,
+                "retrieval_status": result["retrieval_status"],
+                "accepted_dish": result["matched_dish"],
             }
         )
 
@@ -98,7 +98,7 @@ def evaluate(rag: CulinaryRAG) -> dict:
         "accepted_semantic_queries": accepted_count,
         "semantic_query_count": len(SEMANTIC_CASES),
         "unknown_false_acceptance_rate": sum(
-            result.retrieval_status == "matched" for result in unknown_results
+            result["retrieval_status"] == "matched" for result in unknown_results
         )
         / len(unknown_results),
         "distance_threshold": rag.distance_threshold,
@@ -106,7 +106,7 @@ def evaluate(rag: CulinaryRAG) -> dict:
     return {
         "metrics": metrics,
         "semantic_cases": semantic_details,
-        "unknown_cases": [result.to_dict() for result in unknown_results],
+        "unknown_cases": unknown_results,
     }
 
 
