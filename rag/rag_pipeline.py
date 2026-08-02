@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 import re
 from collections.abc import Mapping
-import unicodedata
 
 import chromadb
 import pandas as pd
@@ -25,20 +24,6 @@ UNAVAILABLE_INGREDIENTS = "Ingredient information unavailable"
 UNAVAILABLE_ALLERGENS = "Allergen information unavailable"
 UNAVAILABLE_CUISINE = "Unknown cuisine"
 UNAVAILABLE_SOURCE = "Unknown source"
-
-
-# Menu words and quantities are removed so variants such as
-# "Special Paneer Tikka Full" can match "Paneer Tikka" exactly.
-BRACKETED_SERVING = re.compile(
-    r"[\(\[\{][^\)\]\}]*?(?:\d|full|half|serves?|pcs?|pieces?|ml|gm|kg)"
-    r"[^\)\]\}]*[\)\]\}]",
-    re.IGNORECASE,
-)
-QUANTITY = re.compile(
-    r"\b\d+(?:\.\d+)?\s*(?:ml|l|ltr|litre|g|gm|kg|pc|pcs|piece|pieces|serves?)\b",
-    re.IGNORECASE,
-)
-MENU_MODIFIERS = re.compile(r"\b(?:special|full|half|combo)\b", re.IGNORECASE)
 
 
 CULINARY_SYNONYMS = [
@@ -63,13 +48,16 @@ CULINARY_SYNONYMS = [
 
 
 def normalize_dish_name(dish_name):
-    text = unicodedata.normalize("NFKD", str(dish_name))
-    text = text.encode("ascii", "ignore").decode("ascii")
-    text = BRACKETED_SERVING.sub(" ", text)
-    text = QUANTITY.sub(" ", text)
-    text = MENU_MODIFIERS.sub(" ", text)
-    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text).casefold()
-    return re.sub(r"\s+", " ", text).strip()
+    text = str(dish_name).casefold()
+    text = re.sub(r"\([^)]*\)|\[[^]]*\]|\{[^}]*\}", " ", text)
+    text = re.sub(
+        r"\b\d+(?:\.\d+)?\s*(?:ml|l|ltr|litre|g|gm|kg|pc|pcs|piece|pieces|serve|serves)\b",
+        " ",
+        text,
+    )
+    text = re.sub(r"\b(?:special|full|half|combo)\b", " ", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return " ".join(text.split())
 
 
 def prepare_query(question):
