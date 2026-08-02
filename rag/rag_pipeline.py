@@ -82,10 +82,6 @@ def load_knowledge_base():
     return dishes.drop(columns="_confidence")
 
 
-def display_list(value, fallback="Not available"):
-    return str(value).replace(";", ", ") if value else fallback
-
-
 def create_document(row):
     allergens = row["allergens"]
     if allergens == "none_identified_from_name":
@@ -95,12 +91,12 @@ def create_document(row):
         f"Dish: {row['dish_name']}",
         f"Cuisine: {row['cuisine']}",
         f"Description: {row['description']}",
-        f"Common ingredients: {display_list(row['common_ingredients'], UNAVAILABLE_INGREDIENTS)}",
-        f"Possible allergens: {display_list(allergens, UNAVAILABLE_ALLERGENS)}",
-        f"Dietary tags: {display_list(row['dietary_tags'])}",
-        f"Preparation method: {display_list(row['preparation_method'])}",
-        f"Ingredient variations: {display_list(row['ingredient_variations'])}",
-        f"Possible substitutions: {display_list(row['possible_substitutions'])}",
+        f"Common ingredients: {row['common_ingredients']}",
+        f"Possible allergens: {allergens}",
+        f"Dietary tags: {row['dietary_tags']}",
+        f"Preparation method: {row['preparation_method']}",
+        f"Ingredient variations: {row['ingredient_variations']}",
+        f"Possible substitutions: {row['possible_substitutions']}",
         f"Allergen confidence: {row['allergen_confidence'] or 'Unknown'}",
         f"Source: {row['source']}",
     ])
