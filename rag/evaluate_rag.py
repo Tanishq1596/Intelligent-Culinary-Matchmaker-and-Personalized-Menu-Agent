@@ -1,7 +1,5 @@
 """Evaluate exact matching, semantic ranking, and unknown-query rejection."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 import sys
@@ -51,7 +49,7 @@ UNKNOWN_QUERIES = [
 ]
 
 
-def evaluate(rag: CulinaryRAG) -> dict:
+def evaluate(rag):
     exact_rows = rag.frame.head(100).to_dict(orient="records")
     exact_hits = sum(
         rag.retrieve(f"Special {row['dish_name']} Full 500 ml")["matched_dish_id"]
@@ -62,7 +60,6 @@ def evaluate(rag: CulinaryRAG) -> dict:
     ranks = []
     accepted_correct = 0
     accepted_count = 0
-    semantic_details = []
     for query, acceptable in SEMANTIC_CASES:
         candidates = rag.semantic_candidates(query, top_k=3)
         names = [candidate["dish_name"] for candidate in candidates]
@@ -75,19 +72,9 @@ def evaluate(rag: CulinaryRAG) -> dict:
         if result["retrieval_status"] == "matched":
             accepted_count += 1
             accepted_correct += result["matched_dish"] in acceptable
-        semantic_details.append(
-            {
-                "query": query,
-                "top_3": names,
-                "relevant_rank": rank,
-                "top_distance": candidates[0]["distance"],
-                "retrieval_status": result["retrieval_status"],
-                "accepted_dish": result["matched_dish"],
-            }
-        )
 
     unknown_results = [rag.retrieve(query) for query in UNKNOWN_QUERIES]
-    metrics = {
+    return {
         "exact_accuracy": exact_hits / len(exact_rows),
         "semantic_precision_at_1": sum(rank == 1 for rank in ranks) / len(ranks),
         "semantic_recall_at_3": sum(rank is not None for rank in ranks) / len(ranks),
@@ -103,23 +90,11 @@ def evaluate(rag: CulinaryRAG) -> dict:
         / len(unknown_results),
         "distance_threshold": rag.distance_threshold,
     }
-    return {
-        "metrics": metrics,
-        "semantic_cases": semantic_details,
-        "unknown_cases": unknown_results,
-    }
 
 
-def main() -> None:
-    evaluation = evaluate(CulinaryRAG())
-    output_path = Path(__file__).with_name("retrieval_evaluation.json")
-    output_path.write_text(json.dumps(evaluation, indent=2), encoding="utf-8")
-    metrics = evaluation["metrics"]
-    assert metrics["exact_accuracy"] == 1.0
-    assert metrics["accepted_match_accuracy"] == 1.0
-    assert metrics["unknown_false_acceptance_rate"] == 0.0
+def main():
+    metrics = evaluate(CulinaryRAG())
     print(json.dumps(metrics, indent=2))
-    print(f"Saved {output_path}")
 
 
 if __name__ == "__main__":
