@@ -157,7 +157,6 @@ def check_dish_safety(user_restrictions, rag_result):
             "detected_conflicts": [],
             "conflict_level": "Unknown",
             "reason": "RAG did not return a reliable match, so compatibility cannot be assessed.",
-            "retrieval_status": record.get("retrieval_status", "unknown"),
             "disclaimer": DISCLAIMER,
         }
 
@@ -185,7 +184,6 @@ def check_dish_safety(user_restrictions, rag_result):
         "detected_conflicts": detected,
         "conflict_level": level,
         "reason": reason,
-        "retrieval_status": record.get("retrieval_status", "matched"),
         "disclaimer": DISCLAIMER,
     }
 

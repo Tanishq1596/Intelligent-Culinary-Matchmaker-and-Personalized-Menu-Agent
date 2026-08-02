@@ -18,21 +18,17 @@ def rag_result(
     tags="vegetarian",
     variations="",
     preparation="",
-    status="matched",
+    available=True,
 ):
-    result = {
+    return {
         "requested_dish": dish_name,
-        "matched_dish_id": "test-dish" if status == "matched" else None,
-        "match_type": "exact" if status == "matched" else "none",
+        "matched_dish_id": "test-dish" if available else None,
         "common_ingredients": ingredients,
         "allergens": allergens,
         "dietary_tags": tags,
         "ingredient_variations": variations,
         "preparation_method": preparation,
     }
-    if status != "matched":
-        result["retrieval_status"] = status
-    return result
 
 
 def main():
@@ -75,7 +71,7 @@ def main():
 
     unavailable = check_dish_safety(
         "Soy allergy",
-        rag_result("Royal Chef Bowl", status="no_reliable_match"),
+        rag_result("Royal Chef Bowl", available=False),
     )
     assert unavailable["safety_status"] == "Ingredient information unavailable"
     assert unavailable["conflict_level"] == "Unknown"

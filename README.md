@@ -58,7 +58,7 @@ flowchart TD
 | Subsystem | Selected approach | Evaluation result |
 | --- | --- | --- |
 | Cuisine classification | Logistic Regression | 90.69% untouched-test accuracy across 82 classes and unseen users |
-| Semantic RAG | all-MiniLM-L6-v2 + ChromaDB | Precision@1 86.67%, Recall@3 93.33%, MRR 0.90 |
+| Semantic RAG | all-MiniLM-L6-v2 + ChromaDB | Precision@1 93.33%, Recall@3 93.33%, MRR 0.93 |
 | Unknown-query rejection | Distance threshold 0.35 | 0% false acceptance on the labeled unknown-query set |
 
 The classification notebook compares 10 classifier families, including logistic regression, linear and RBF SVM, Naive Bayes, random forest, KNN, and XGBoost. `user_id` is used only to group historical orders and keep users isolated across train, validation, and test splits; it is never encoded as a model feature. Model selection uses validation data; final metrics are reported on untouched test data.
@@ -98,6 +98,7 @@ Only likely-compatible and warning candidates may reach Gemini. Rejected and unk
 |-- LLM/
 |   `-- llm_generator.py           # Grounded Gemini generation
 |-- rag/
+|   |-- build_index.py             # One-time ChromaDB index builder
 |   |-- rag_pipeline.py            # Exact and semantic retrieval
 |   `-- evaluate_rag.py
 |-- src/
@@ -169,6 +170,12 @@ Evaluate RAG retrieval:
 
 ```powershell
 python rag/evaluate_rag.py
+```
+
+Rebuild ChromaDB only after changing the culinary knowledge or embedding setup:
+
+```powershell
+python -m rag.build_index
 ```
 
 The model-development notebooks are intentionally readable and interview-oriented:

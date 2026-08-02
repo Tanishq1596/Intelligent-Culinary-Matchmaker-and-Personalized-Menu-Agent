@@ -1,10 +1,7 @@
 """Build and query the culinary knowledge base with embeddings and ChromaDB."""
 
-import argparse
-import json
 from pathlib import Path
 import re
-from collections.abc import Mapping
 
 import chromadb
 import pandas as pd
@@ -18,12 +15,6 @@ MODEL_CACHE_PATH = PROJECT_ROOT / ".model_cache"
 COLLECTION_NAME = "culinary_dishes_v1"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DISTANCE_THRESHOLD = 0.35
-LOW_CONFIDENCE_MARGIN = 0.15
-
-UNAVAILABLE_INGREDIENTS = "Ingredient information unavailable"
-UNAVAILABLE_ALLERGENS = "Allergen information unavailable"
-UNAVAILABLE_CUISINE = "Unknown cuisine"
-UNAVAILABLE_SOURCE = "Unknown source"
 
 
 CULINARY_SYNONYMS = [
@@ -189,53 +180,6 @@ def prepare_query(dish_name):
     return query
 
 
-def matched_result(requested_dish, normalized_query, row, match_type, distance):
-    return {
-        "requested_dish": requested_dish,
-        "normalized_query": normalized_query,
-        "matched_dish": row["dish_name"],
-        "matched_dish_id": str(row["dish_id"]),
-        "nearest_dish": row["dish_name"],
-        "match_type": match_type,
-        "distance": round(distance, 6),
-        "cuisine": row["cuisine"],
-        "common_ingredients": row["common_ingredients"],
-        "allergens": row["allergens"],
-        "dietary_tags": row["dietary_tags"],
-        "description": row["description"],
-        "possible_substitutions": row["possible_substitutions"],
-        "preparation_method": row["preparation_method"],
-        "ingredient_variations": row["ingredient_variations"],
-        "allergen_confidence": row["allergen_confidence"],
-        "source": row["source"],
-        "requires_manual_confirmation": True,
-    }
-
-
-def unavailable_result(requested_dish, normalized_query, status, nearest=None, distance=None):
-    return {
-        "requested_dish": requested_dish,
-        "normalized_query": normalized_query,
-        "matched_dish": None,
-        "matched_dish_id": None,
-        "nearest_dish": nearest,
-        "match_type": "none",
-        "retrieval_status": status,
-        "distance": round(distance, 6) if distance is not None else None,
-        "cuisine": UNAVAILABLE_CUISINE,
-        "common_ingredients": UNAVAILABLE_INGREDIENTS,
-        "allergens": UNAVAILABLE_ALLERGENS,
-        "dietary_tags": "Dietary information unavailable",
-        "description": "Culinary information unavailable",
-        "possible_substitutions": "",
-        "preparation_method": "",
-        "ingredient_variations": "",
-        "allergen_confidence": "unknown",
-        "source": UNAVAILABLE_SOURCE,
-        "requires_manual_confirmation": True,
-    }
-
-
 class CulinaryRAG:
     def __init__(self, distance_threshold=DISTANCE_THRESHOLD):
         self.frame = load_knowledge_base()
@@ -250,46 +194,28 @@ class CulinaryRAG:
 
     # The agent passes all dishes shortlisted by Pandas filtering here.
     def retrieve_many(self, candidates, top_k=3):
-        results = []
-        for candidate in candidates:
-            if isinstance(candidate, Mapping):
-                dish_name = candidate.get("dish_name", "")
-                cuisine = candidate.get("cuisine")
-            else:
-                dish_name = str(candidate)
-                cuisine = None
-            results.append(self.retrieve(dish_name, cuisine, top_k))
-        return results
+        return [
+            self.retrieve(candidate["dish_name"], candidate.get("cuisine"), top_k)
+            for candidate in candidates
+        ]
 
     def retrieve(self, requested_dish, cuisine=None, top_k=3):
         normalized = normalize_dish_name(requested_dish)
         exact_match = self.records_by_name.get(normalized)
 
         if exact_match:
-            return matched_result(requested_dish, normalized, exact_match, "exact", 0.0)
+            return self.matched_result(requested_dish, exact_match)
 
         candidates = self.semantic_candidates(requested_dish, cuisine, top_k)
-        if not candidates:
-            return unavailable_result(requested_dish, normalized, "no_reliable_match")
+        if candidates and candidates[0]["distance"] <= self.distance_threshold:
+            row = self.records_by_id[candidates[0]["dish_id"]]
+            return self.matched_result(requested_dish, row)
 
-        nearest = candidates[0]
-        distance = nearest["distance"]
-
-        if distance <= self.distance_threshold:
-            row = self.records_by_id[nearest["dish_id"]]
-            return matched_result(requested_dish, normalized, row, "vector", distance)
-
-        status = "low_confidence"
-        if distance > self.distance_threshold + LOW_CONFIDENCE_MARGIN:
-            status = "no_reliable_match"
-
-        return unavailable_result(
-            requested_dish,
-            normalized,
-            status,
-            nearest["dish_name"],
-            distance,
-        )
+        return {
+            "requested_dish": requested_dish,
+            "matched_dish": None,
+            "matched_dish_id": None,
+        }
 
     def semantic_candidates(self, dish_name, cuisine=None, top_k=3):
         dish_embedding = self.embed_model.encode(
@@ -313,34 +239,30 @@ class CulinaryRAG:
             candidates.append({
                 "dish_id": dish_id,
                 "dish_name": metadata["dish_name"],
-                "cuisine": metadata["cuisine"],
                 "distance": round(float(distance), 6),
-                "similarity": round(max(0.0, 1.0 - float(distance)), 6),
             })
         return candidates
+
+    def matched_result(self, requested_dish, row):
+        return {
+            "requested_dish": requested_dish,
+            "matched_dish": row["dish_name"],
+            "matched_dish_id": str(row["dish_id"]),
+            "cuisine": row["cuisine"],
+            "common_ingredients": row["common_ingredients"],
+            "allergens": row["allergens"],
+            "dietary_tags": row["dietary_tags"],
+            "description": row["description"],
+            "possible_substitutions": row["possible_substitutions"],
+            "preparation_method": row["preparation_method"],
+            "ingredient_variations": row["ingredient_variations"],
+            "allergen_confidence": row["allergen_confidence"],
+            "source": row["source"],
+            "requires_manual_confirmation": True,
+        }
 
     @property
     def embed_model(self):
         if self._embed_model is None:
             self._embed_model = load_embedding_model()
         return self._embed_model
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build", action="store_true", help="Build or reuse the index")
-    parser.add_argument("--rebuild", action="store_true", help="Rebuild the index")
-    parser.add_argument("--query", help="Retrieve knowledge for one dish")
-    parser.add_argument("--cuisine", help="Optionally filter by cuisine")
-    args = parser.parse_args()
-
-    if args.build or args.rebuild:
-        print(json.dumps(build_vector_index(rebuild=args.rebuild), indent=2))
-    if args.query:
-        print(json.dumps(CulinaryRAG().retrieve(args.query, args.cuisine), indent=2))
-    if not (args.build or args.rebuild or args.query):
-        parser.print_help()
-
-
-if __name__ == "__main__":
-    main()
