@@ -60,8 +60,8 @@ def normalize_dish_name(dish_name):
     return " ".join(text.split())
 
 
-def prepare_query(question):
-    normalized = normalize_dish_name(question)
+def prepare_query(dish_name):
+    normalized = normalize_dish_name(dish_name)
     synonyms = [
         replacement
         for phrases, replacement in CULINARY_SYNONYMS
@@ -70,12 +70,12 @@ def prepare_query(question):
     alternatives = ", ".join(synonyms) if synonyms else "none"
 
     return (
-        f"Dish: {question}\n"
+        f"Dish: {dish_name}\n"
         f"Indian dish-name equivalents: {alternatives}\n"
         f"Alternative dish terms: {alternatives}\n"
         f"Canonical Indian dish terms: {alternatives}\n"
-        f"Description: {question}\n"
-        f"Common ingredients or style: {question}"
+        f"Description: {dish_name}\n"
+        f"Common ingredients or style: {dish_name}"
     )
 
 
@@ -265,14 +265,14 @@ class CulinaryRAG:
             self._embed_model = load_embedding_model()
         return self._embed_model
 
-    def semantic_candidates(self, question, cuisine=None, top_k=3):
-        question_embedding = self.embed_model.encode(
-            [prepare_query(question)],
+    def semantic_candidates(self, dish_name, cuisine=None, top_k=3):
+        dish_embedding = self.embed_model.encode(
+            [prepare_query(dish_name)],
             normalize_embeddings=True,
         )[0]
 
         search_results = self.collection.query(
-            query_embeddings=[question_embedding.tolist()],
+            query_embeddings=[dish_embedding.tolist()],
             n_results=top_k,
             where=cuisine_filter(cuisine),
             include=["metadatas", "distances"],
