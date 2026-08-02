@@ -83,16 +83,12 @@ def load_knowledge_base():
 
 
 def create_document(row):
-    allergens = row["allergens"]
-    if allergens == "none_identified_from_name":
-        allergens = "No allergen identified from the menu name; absence is not confirmed"
-
     return "\n".join([
         f"Dish: {row['dish_name']}",
         f"Cuisine: {row['cuisine']}",
         f"Description: {row['description']}",
         f"Common ingredients: {row['common_ingredients']}",
-        f"Possible allergens: {allergens}",
+        f"Possible allergens: {row['allergens']}",
         f"Dietary tags: {row['dietary_tags']}",
         f"Preparation method: {row['preparation_method']}",
         f"Ingredient variations: {row['ingredient_variations']}",
