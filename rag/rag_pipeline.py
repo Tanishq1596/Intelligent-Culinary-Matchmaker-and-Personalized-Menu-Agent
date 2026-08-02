@@ -49,7 +49,13 @@ CULINARY_SYNONYMS = [
 
 def normalize_dish_name(dish_name):
     text = str(dish_name).casefold()
-    text = re.sub(r"\([^)]*\)|\[[^]]*\]|\{[^}]*\}", " ", text)
+    bracketed_parts = re.findall(r"\([^)]*\)|\[[^]]*\]|\{[^}]*\}", text)
+    serving_words = ("full", "half", "serve", "pc", "piece", "ml", "gm", "kg", "pack")
+    for part in bracketed_parts:
+        if any(character.isdigit() for character in part) or any(
+            word in part for word in serving_words
+        ):
+            text = text.replace(part, " ")
     text = re.sub(
         r"\b\d+(?:\.\d+)?\s*(?:ml|l|ltr|litre|g|gm|kg|pc|pcs|piece|pieces|serve|serves)\b",
         " ",
@@ -61,7 +67,7 @@ def normalize_dish_name(dish_name):
 
 
 def load_knowledge_base():
-    dishes = pd.read_csv(DATA_PATH, keep_default_na=False, low_memory=False)
+    dishes = pd.read_csv(DATA_PATH, keep_default_na=False)
     dishes["normalized_dish_name"] = dishes["dish_name"].map(normalize_dish_name)
 
     # When menu variants normalize to the same name, keep the row with the
@@ -73,7 +79,7 @@ def load_knowledge_base():
         ascending=[False, False, True],
     )
     dishes = dishes.drop_duplicates("normalized_dish_name")
-    return dishes.drop(columns="_confidence").reset_index(drop=True)
+    return dishes.drop(columns="_confidence")
 
 
 def display_list(value, fallback="Not available"):
