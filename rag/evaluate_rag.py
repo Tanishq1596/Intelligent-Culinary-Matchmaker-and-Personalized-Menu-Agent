@@ -12,25 +12,27 @@ from rag.rag_pipeline import CulinaryRAG
 
 
 SEMANTIC_CASES = [
-    ("Shahi Butter Paneer Curry", {"Shahi Paneer", "Paneer Butter Masala"}),
-    ("Chickpea Masala", {"Chana Masala", "Chole Masala"}),
-    ("Cottage Cheese Spinach Curry", {"Paneer Palak", "Palak Paneer"}),
-    ("Lentil Tadka", {"Dal Tadka", "Dal Fry Tadka", "Yellow Dal Tadka"}),
-    ("Kidney Bean Masala", {"Rajma Masala", "Rajma"}),
+    ("Shahi Butter Paneer Curry", "North Indian", {"Shahi Paneer", "Paneer Butter Masala"}),
+    ("Chickpea Masala", "North Indian", {"Chana Masala", "Chole Masala"}),
+    ("Cottage Cheese Spinach Curry", "North Indian", {"Paneer Palak", "Palak Paneer"}),
+    ("Lentil Tadka", "North Indian", {"Dal Tadka", "Dal Fry Tadka", "Yellow Dal Tadka"}),
+    ("Kidney Bean Masala", "North Indian", {"Rajma Masala", "Rajma"}),
     (
         "Boneless Chicken Butter Masala",
+        "North Indian, Bengali",
         {"Boneless Chicken Masala", "Chicken Butter Masala", "Butter Chicken Boneless"},
     ),
-    ("Vegetable Hakka Noodle", {"Hakka Noodles", "Veg Hakka Noodles"}),
-    ("Steamed Rice and Lentil Cake", {"Idli", "Plain Idli", "Rice Idli"}),
-    ("Flattened Rice Breakfast Dish", {"Poha", "Plain Poha", "Kanda Poha"}),
-    ("Semolina Breakfast Dish", {"Upma", "Veg Upma", "Vegetable Upma"}),
-    ("Grilled Cottage Cheese Cubes", {"Paneer Tikka", "Paneer Tikka Dry"}),
-    ("Yogurt Cucumber Side Dish", {"Cucumber Raita", "Raita"}),
-    ("Spiced Potato Cauliflower Curry", {"Aloo Gobi", "Aloo Gobi Masala"}),
-    ("Dum Cooked Vegetable Rice", {"Veg Dum Biryani", "Veg Biryani", "Dum Biryani"}),
+    ("Vegetable Hakka Noodle", "Indo-Chinese", {"Hakka Noodles", "Veg Hakka Noodles"}),
+    ("Steamed Rice and Lentil Cake", "South Indian", {"Idli", "Plain Idli", "Rice Idli"}),
+    ("Flattened Rice Breakfast Dish", "Maharashtrian", {"Poha", "Plain Poha", "Kanda Poha"}),
+    ("Semolina Breakfast Dish", "South Indian", {"Upma", "Veg Upma", "Vegetable Upma"}),
+    ("Grilled Cottage Cheese Cubes", "North Indian", {"Paneer Tikka", "Paneer Tikka Dry"}),
+    ("Yogurt Cucumber Side Dish", "Indian, North Indian", {"Cucumber Raita", "Raita"}),
+    ("Spiced Potato Cauliflower Curry", "North Indian, Chinese", {"Aloo Gobi", "Aloo Gobi Masala"}),
+    ("Dum Cooked Vegetable Rice", "Biryani", {"Veg Dum Biryani", "Veg Biryani", "Dum Biryani"}),
     (
         "Crispy Chickpea Flour Fritters",
+        "North Indian, Snacks, Indian, Bengali",
         {"Pakoda", "Pakora", "Mix Pakoda", "Mix Pakora"},
     ),
 ]
@@ -52,7 +54,7 @@ UNKNOWN_QUERIES = [
 def evaluate(rag):
     exact_rows = rag.frame.head(100).to_dict(orient="records")
     exact_hits = sum(
-        rag.retrieve(f"Special {row['dish_name']} Full 500 ml")["matched_dish_id"]
+        rag.retrieve(f"Special {row['dish_name']} Full 500 ml", row["cuisine"])["matched_dish_id"]
         == str(row["dish_id"])
         for row in exact_rows
     )
@@ -60,20 +62,20 @@ def evaluate(rag):
     ranks = []
     accepted_correct = 0
     accepted_count = 0
-    for query, acceptable in SEMANTIC_CASES:
-        candidates = rag.semantic_candidates(query, top_k=3)
+    for query, cuisine, acceptable in SEMANTIC_CASES:
+        candidates = rag.semantic_candidates(query, cuisine, top_k=3)
         names = [candidate["dish_name"] for candidate in candidates]
         rank = next(
             (index + 1 for index, name in enumerate(names) if name in acceptable),
             None,
         )
-        result = rag.retrieve(query)
+        result = rag.retrieve(query, cuisine)
         ranks.append(rank)
         if result["matched_dish_id"]:
             accepted_count += 1
             accepted_correct += result["matched_dish"] in acceptable
 
-    unknown_results = [rag.retrieve(query) for query in UNKNOWN_QUERIES]
+    unknown_results = [rag.retrieve(query, "Indian") for query in UNKNOWN_QUERIES]
     return {
         "exact_accuracy": exact_hits / len(exact_rows),
         "semantic_precision_at_1": sum(rank == 1 for rank in ranks) / len(ranks),

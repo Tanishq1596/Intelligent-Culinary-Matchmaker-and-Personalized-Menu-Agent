@@ -159,9 +159,7 @@ def build_vector_index(rebuild=False):
 
 
 def cuisine_filter(cuisine):
-    cuisines = [item.strip() for item in re.split(r"[,/]", cuisine or "") if item.strip()]
-    if not cuisines:
-        return None
+    cuisines = [item.strip() for item in re.split(r"[,/]", cuisine) if item.strip()]
     if len(cuisines) == 1:
         return {"cuisine": cuisines[0]}
     return {"cuisine": {"$in": cuisines}}
@@ -195,11 +193,11 @@ class CulinaryRAG:
     # The agent passes all dishes shortlisted by Pandas filtering here.
     def retrieve_many(self, candidates, top_k=3):
         return [
-            self.retrieve(candidate["dish_name"], candidate.get("cuisine"), top_k)
+            self.retrieve(candidate["dish_name"], candidate["cuisine"], top_k)
             for candidate in candidates
         ]
 
-    def retrieve(self, requested_dish, cuisine=None, top_k=3):
+    def retrieve(self, requested_dish, cuisine, top_k=3):
         normalized = normalize_dish_name(requested_dish)
         exact_match = self.records_by_name.get(normalized)
 
@@ -217,7 +215,7 @@ class CulinaryRAG:
             "matched_dish_id": None,
         }
 
-    def semantic_candidates(self, dish_name, cuisine=None, top_k=3):
+    def semantic_candidates(self, dish_name, cuisine, top_k=3):
         dish_embedding = self.embed_model.encode(
             [prepare_query(dish_name)],
             normalize_embeddings=True,
