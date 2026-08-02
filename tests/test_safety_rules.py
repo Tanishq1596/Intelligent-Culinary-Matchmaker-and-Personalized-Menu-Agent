@@ -20,9 +20,9 @@ def rag_result(
     preparation="",
     status="matched",
 ):
-    return {
+    result = {
         "requested_dish": dish_name,
-        "retrieval_status": status,
+        "matched_dish_id": "test-dish" if status == "matched" else None,
         "match_type": "exact" if status == "matched" else "none",
         "common_ingredients": ingredients,
         "allergens": allergens,
@@ -30,6 +30,9 @@ def rag_result(
         "ingredient_variations": variations,
         "preparation_method": preparation,
     }
+    if status != "matched":
+        result["retrieval_status"] = status
+    return result
 
 
 def main():

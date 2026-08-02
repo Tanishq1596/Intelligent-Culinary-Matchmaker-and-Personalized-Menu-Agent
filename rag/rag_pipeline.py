@@ -197,9 +197,7 @@ def matched_result(requested_dish, normalized_query, row, match_type, distance):
         "matched_dish_id": str(row["dish_id"]),
         "nearest_dish": row["dish_name"],
         "match_type": match_type,
-        "retrieval_status": "matched",
         "distance": round(distance, 6),
-        "confidence": round(max(0.0, 1.0 - distance), 6),
         "cuisine": row["cuisine"],
         "common_ingredients": row["common_ingredients"],
         "allergens": row["allergens"],
@@ -215,7 +213,6 @@ def matched_result(requested_dish, normalized_query, row, match_type, distance):
 
 
 def unavailable_result(requested_dish, normalized_query, status, nearest=None, distance=None):
-    confidence = max(0.0, 1.0 - distance) if distance is not None else None
     return {
         "requested_dish": requested_dish,
         "normalized_query": normalized_query,
@@ -225,7 +222,6 @@ def unavailable_result(requested_dish, normalized_query, status, nearest=None, d
         "match_type": "none",
         "retrieval_status": status,
         "distance": round(distance, 6) if distance is not None else None,
-        "confidence": round(confidence, 6) if confidence is not None else None,
         "cuisine": UNAVAILABLE_CUISINE,
         "common_ingredients": UNAVAILABLE_INGREDIENTS,
         "allergens": UNAVAILABLE_ALLERGENS,

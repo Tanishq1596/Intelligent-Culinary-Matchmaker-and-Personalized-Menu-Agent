@@ -69,7 +69,7 @@ def evaluate(rag):
         )
         result = rag.retrieve(query)
         ranks.append(rank)
-        if result["retrieval_status"] == "matched":
+        if result["matched_dish_id"]:
             accepted_count += 1
             accepted_correct += result["matched_dish"] in acceptable
 
@@ -85,7 +85,7 @@ def evaluate(rag):
         "accepted_semantic_queries": accepted_count,
         "semantic_query_count": len(SEMANTIC_CASES),
         "unknown_false_acceptance_rate": sum(
-            result["retrieval_status"] == "matched" for result in unknown_results
+            result["matched_dish_id"] is not None for result in unknown_results
         )
         / len(unknown_results),
         "distance_threshold": rag.distance_threshold,

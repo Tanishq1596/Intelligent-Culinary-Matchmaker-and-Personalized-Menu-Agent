@@ -143,7 +143,6 @@ def check_dish_safety(user_restrictions, rag_result):
     """Classify one RAG result using deterministic dietary and allergy rules."""
     restrictions = normalize_restrictions(user_restrictions)
     record = rag_record(rag_result)
-    retrieval_status = normalize_text(record.get("retrieval_status", ""))
     dish_name = (
         record.get("requested_dish")
         or record.get("dish_name")
@@ -151,7 +150,7 @@ def check_dish_safety(user_restrictions, rag_result):
         or "Unknown dish"
     )
 
-    if retrieval_status != "matched":
+    if not record.get("matched_dish_id"):
         return {
             "dish_name": dish_name,
             "safety_status": INFORMATION_UNAVAILABLE,
@@ -194,4 +193,3 @@ def check_dish_safety(user_restrictions, rag_result):
 def screen_dishes(user_restrictions, rag_results):
     """Apply the same safety rules to every shortlisted RAG result."""
     return [check_dish_safety(user_restrictions, result) for result in rag_results]
-
