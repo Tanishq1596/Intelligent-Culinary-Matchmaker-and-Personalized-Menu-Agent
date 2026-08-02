@@ -28,7 +28,7 @@ UNAVAILABLE_SOURCE = "Unknown source"
 
 CULINARY_SYNONYMS = [
     (("grilled cottage cheese",), "paneer tikka"),
-    (("potato cauliflower", "potato and cauliflower"), "aloo gobi"),
+    (("potato cauliflower", "potato and cauliflower"), "aloo gobi masala"),
     (("chickpea flour fritter", "chickpea flour fritters"), "pakoda pakora"),
     (("dum cooked vegetable rice", "dum cooked vegetables and rice"), "veg dum biryani"),
     (("chickpea", "chickpeas"), "chana chole"),
@@ -39,6 +39,7 @@ CULINARY_SYNONYMS = [
     (("eggplant", "aubergine"), "baingan brinjal"),
     (("okra", "lady finger", "ladyfinger"), "bhindi"),
     (("yogurt",), "curd dahi"),
+    (("yogurt cucumber", "cucumber yogurt"), "cucumber raita"),
     (("flatbread",), "roti chapati"),
     (("rice lentil pancake", "rice and lentil pancake"), "dosa"),
     (("steamed rice lentil cake", "steamed rice and lentil cake"), "idli"),
@@ -182,16 +183,10 @@ def prepare_query(dish_name):
         for phrases, replacement in CULINARY_SYNONYMS
         if any(phrase in normalized for phrase in phrases)
     ]
-    alternatives = ", ".join(synonyms) if synonyms else "none"
-
-    return (
-        f"Dish: {dish_name}\n"
-        f"Indian dish-name equivalents: {alternatives}\n"
-        f"Alternative dish terms: {alternatives}\n"
-        f"Canonical Indian dish terms: {alternatives}\n"
-        f"Description: {dish_name}\n"
-        f"Common ingredients or style: {dish_name}"
-    )
+    query = f"Dish: {dish_name}"
+    if synonyms:
+        query += f"\nAlternative Indian dish names: {', '.join(synonyms)}"
+    return query
 
 
 def matched_result(requested_dish, normalized_query, row, match_type, distance):
