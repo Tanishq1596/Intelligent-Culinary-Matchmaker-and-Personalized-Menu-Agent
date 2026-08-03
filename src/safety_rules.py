@@ -116,7 +116,7 @@ def check_dish_safety(user_restrictions, rag_result):
     if direct:
         status = REJECTED
         level = "Direct"
-        detected = direct + [term for term in possible if term not in direct]
+        detected = direct
         reason = "Known restricted terms were found: " + ", ".join(direct) + "."
     elif possible:
         status = POSSIBLE_CONFLICT
