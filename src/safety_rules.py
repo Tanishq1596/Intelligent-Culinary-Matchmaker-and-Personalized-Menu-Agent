@@ -64,16 +64,6 @@ def has_term(text, term):
     return f" {normalize_text(term)} " in f" {normalize_text(text)} "
 
 
-def split_items(value):
-    """Split semicolon and comma separated knowledge fields into items."""
-    items = []
-    for item in re.split(r"[;,|]+", str(value or "")):
-        item = normalize_text(item)
-        if item:
-            items.append(item)
-    return items
-
-
 def rag_record(rag_result):
     """Accept either a RetrievalResult object or its dictionary representation."""
     if isinstance(rag_result, Mapping):
@@ -90,7 +80,8 @@ def find_conflicts(record, restrictions):
     for restriction in restrictions:
         for field in DIRECT_FIELDS + POSSIBLE_FIELDS:
             default_level = "possible" if field in POSSIBLE_FIELDS else "direct"
-            for item in split_items(record.get(field, "")):
+            for item in record.get(field, "").split(","):
+                item = normalize_text(item)
                 level = default_level
                 if any(has_term(item, word) for word in UNCERTAIN_WORDS):
                     level = "possible"
