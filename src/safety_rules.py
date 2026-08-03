@@ -99,12 +99,7 @@ def check_dish_safety(user_restrictions, rag_result):
     """Classify one RAG result using deterministic dietary and allergy rules."""
     restrictions = user_restrictions or []
     record = rag_result
-    dish_name = (
-        record.get("requested_dish")
-        or record.get("dish_name")
-        or record.get("matched_dish")
-        or "Unknown dish"
-    )
+    dish_name = record["requested_dish"]
 
     if not record.get("matched_dish_id"):
         return {
