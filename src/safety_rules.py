@@ -55,18 +55,23 @@ UNCERTAIN_WORDS = (
 def normalize_text(value):
     """Create lowercase searchable text while preserving word boundaries."""
     text = str(value or "").casefold().replace("_", " ").replace("-", " ")
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
     return " ".join(text.split())
 
 
 def has_term(text, term):
     """Match a whole ingredient term, so 'egg' does not match 'eggplant'."""
-    pattern = rf"(?<![a-z0-9]){re.escape(normalize_text(term))}(?![a-z0-9])"
-    return re.search(pattern, normalize_text(text)) is not None
+    return f" {normalize_text(term)} " in f" {normalize_text(text)} "
 
 
 def split_items(value):
     """Split semicolon and comma separated knowledge fields into items."""
-    return [item.strip() for item in re.split(r"[;,|]+", normalize_text(value)) if item.strip()]
+    items = []
+    for item in re.split(r"[;,|]+", str(value or "")):
+        item = normalize_text(item)
+        if item:
+            items.append(item)
+    return items
 
 
 def rag_record(rag_result):
