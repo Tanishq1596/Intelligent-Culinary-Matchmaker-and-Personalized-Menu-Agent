@@ -65,26 +65,33 @@ def has_term(text, term):
 
 def find_conflicts(record, restrictions):
     """Return detected terms with direct conflicts taking priority."""
-    conflicts = {}
+    direct_items = []
+    possible_items = []
 
+    for field in DIRECT_FIELDS:
+        for item in record.get(field, "").split(","):
+            item = normalize_text(item)
+            if any(has_term(item, word) for word in UNCERTAIN_WORDS):
+                possible_items.append(item)
+            else:
+                direct_items.append(item)
+
+    for field in POSSIBLE_FIELDS:
+        possible_items.extend(
+            normalize_text(item) for item in record.get(field, "").split(",")
+        )
+
+    direct = []
+    possible = []
     for restriction in restrictions:
-        for field in DIRECT_FIELDS + POSSIBLE_FIELDS:
-            default_level = "possible" if field in POSSIBLE_FIELDS else "direct"
-            for item in record.get(field, "").split(","):
-                item = normalize_text(item)
-                level = default_level
-                if any(has_term(item, word) for word in UNCERTAIN_WORDS):
-                    level = "possible"
+        for term in CONFLICT_TERMS[restriction]:
+            if any(has_term(item, term) for item in direct_items):
+                if term not in direct:
+                    direct.append(term)
+            elif any(has_term(item, term) for item in possible_items):
+                if term not in possible:
+                    possible.append(term)
 
-                for term in CONFLICT_TERMS[restriction]:
-                    if not has_term(item, term):
-                        continue
-                    previous_level = conflicts.get(term)
-                    if previous_level != "direct":
-                        conflicts[term] = level
-
-    direct = [term for term, level in conflicts.items() if level == "direct"]
-    possible = [term for term, level in conflicts.items() if level == "possible"]
     return direct, possible
 
 
