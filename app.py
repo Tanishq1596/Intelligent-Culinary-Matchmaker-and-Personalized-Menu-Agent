@@ -19,16 +19,16 @@ HISTORY_PATH = PROJECT_ROOT / "data" / "user_order_history.csv"
 RESTAURANT_PATH = PROJECT_ROOT / "data" / "swiggy_cleaned_sample_expanded.csv"
 
 RESTRICTION_OPTIONS = {
-    "Lactose intolerant": "Lactose intolerance",
-    "Gluten sensitive": "Gluten sensitivity",
-    "Vegan": "Vegan",
+    "Lactose intolerant": "lactose intolerance",
+    "Gluten sensitive": "gluten sensitivity",
+    "Vegan": "vegan",
 }
 
 ALLERGY_OPTIONS = {
-    "Peanut allergy": "Peanut allergy",
-    "Tree-nut allergy": "Tree-nut allergy",
-    "Egg allergy": "Egg allergy",
-    "Soy allergy": "Soy allergy",
+    "Peanut allergy": "peanut allergy",
+    "Tree-nut allergy": "tree nut allergy",
+    "Egg allergy": "egg allergy",
+    "Soy allergy": "soy allergy",
 }
 
 MINIMUM_ONBOARDING_DISHES = 5

@@ -33,7 +33,7 @@ def rag_result(
 
 def main():
     paneer = check_dish_safety(
-        ["Lactose intolerant", "Vegetarian"],
+        ["lactose intolerance", "vegetarian"],
         rag_result(
             "Paneer Butter Masala",
             ingredients="paneer;butter;cream;tomato",
@@ -44,71 +44,71 @@ def main():
     assert {"paneer", "butter", "cream", "dairy"} <= set(paneer["detected_conflicts"])
 
     dal = check_dish_safety(
-        "Lactose intolerance",
+        ["lactose intolerance"],
         rag_result("Dal Tadka", ingredients="lentils;tomato", variations="may use ghee"),
     )
     assert dal["safety_status"] == "Possible dietary conflict"
     assert dal["detected_conflicts"] == ["ghee"]
 
     chana = check_dish_safety(
-        ["Lactose intolerance", "Vegetarian"],
+        ["lactose intolerance", "vegetarian"],
         rag_result("Chana Masala", ingredients="chickpeas;tomato;onion;spices"),
     )
     assert chana["safety_status"] == "Likely compatible"
     assert "cannot guarantee medical safety" in chana["disclaimer"]
 
     peanut = check_dish_safety(
-        "Peanut allergy",
+        ["peanut allergy"],
         rag_result("Peanut Chutney", ingredients="peanut;chilli", allergens="peanut"),
     )
     assert peanut["safety_status"] == "Rejected due to known conflict"
 
     traces = check_dish_safety(
-        "Peanut allergy",
+        ["peanut allergy"],
         rag_result("Mixed Chutney", ingredients="coconut;chilli", allergens="may contain traces of peanuts"),
     )
     assert traces["safety_status"] == "Possible dietary conflict"
 
     unavailable = check_dish_safety(
-        "Soy allergy",
+        ["soy allergy"],
         rag_result("Royal Chef Bowl", available=False),
     )
     assert unavailable["safety_status"] == "Ingredient information unavailable"
     assert unavailable["conflict_level"] == "Unknown"
 
     vegetarian_paneer = check_dish_safety(
-        "Vegetarian",
+        ["vegetarian"],
         rag_result("Paneer Tikka", ingredients="paneer;spices", allergens="dairy"),
     )
     vegan_paneer = check_dish_safety(
-        "Vegan",
+        ["vegan"],
         rag_result("Paneer Tikka", ingredients="paneer;spices", allergens="dairy"),
     )
     assert vegetarian_paneer["safety_status"] == "Likely compatible"
     assert vegan_paneer["safety_status"] == "Rejected due to known conflict"
 
     eggplant = check_dish_safety(
-        "Egg allergy",
+        ["egg allergy"],
         rag_result("Eggplant Curry", ingredients="eggplant;tomato;spices"),
     )
     assert eggplant["safety_status"] == "Likely compatible"
 
     direct_cases = [
-        ("Tree-nut allergy", "Kaju Curry", "cashew;tomato", "cashew"),
-        ("Gluten sensitivity", "Naan", "wheat flour;salt", "wheat"),
-        ("Egg allergy", "Egg Curry", "eggs;tomato", "eggs"),
-        ("Soy allergy", "Tofu Stir Fry", "tofu;vegetables", "tofu"),
-        ("Vegetarian", "Chicken Curry", "chicken;spices", "chicken"),
+        ("tree nut allergy", "Kaju Curry", "cashew;tomato", "cashew"),
+        ("gluten sensitivity", "Naan", "wheat flour;salt", "wheat"),
+        ("egg allergy", "Egg Curry", "eggs;tomato", "eggs"),
+        ("soy allergy", "Tofu Stir Fry", "tofu;vegetables", "tofu"),
+        ("vegetarian", "Chicken Curry", "chicken;spices", "chicken"),
     ]
     for restriction, dish, ingredients, expected_term in direct_cases:
         result = check_dish_safety(
-            restriction,
+            [restriction],
             rag_result(dish, ingredients=ingredients),
         )
         assert result["safety_status"] == "Rejected due to known conflict"
         assert expected_term in result["detected_conflicts"]
 
-    screened = screen_dishes("Lactose intolerance", [
+    screened = screen_dishes(["lactose intolerance"], [
         rag_result("Paneer Curry", ingredients="paneer;tomato", allergens="dairy"),
         rag_result("Chana Masala", ingredients="chickpeas;tomato"),
     ])

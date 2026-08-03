@@ -44,24 +44,6 @@ CONFLICT_TERMS = {
     ),
 }
 
-RESTRICTION_ALIASES = {
-    "lactose intolerant": "lactose intolerance",
-    "lactose intolerance": "lactose intolerance",
-    "peanut allergy": "peanut allergy",
-    "peanut allergic": "peanut allergy",
-    "tree nut allergy": "tree nut allergy",
-    "tree nut allergic": "tree nut allergy",
-    "gluten sensitivity": "gluten sensitivity",
-    "gluten sensitive": "gluten sensitivity",
-    "egg allergy": "egg allergy",
-    "egg allergic": "egg allergy",
-    "soy allergy": "soy allergy",
-    "soya allergy": "soy allergy",
-    "soy allergic": "soy allergy",
-    "vegan": "vegan",
-    "vegetarian": "vegetarian",
-}
-
 DIRECT_FIELDS = ("common_ingredients", "allergens", "dietary_tags")
 POSSIBLE_FIELDS = ("ingredient_variations", "preparation_method")
 UNCERTAIN_WORDS = (
@@ -74,25 +56,6 @@ def normalize_text(value):
     """Create lowercase searchable text while preserving word boundaries."""
     text = str(value or "").casefold().replace("_", " ").replace("-", " ")
     return " ".join(text.split())
-
-
-def normalize_restrictions(restrictions):
-    """Return unique supported restriction names and reject unknown values."""
-    if restrictions is None:
-        return []
-    if isinstance(restrictions, str):
-        restrictions = [restrictions]
-
-    normalized = []
-    for restriction in restrictions:
-        key = normalize_text(restriction)
-        name = RESTRICTION_ALIASES.get(key)
-        if name is None:
-            supported = ", ".join(CONFLICT_TERMS)
-            raise ValueError(f"Unsupported restriction: {restriction}. Supported: {supported}")
-        if name not in normalized:
-            normalized.append(name)
-    return normalized
 
 
 def has_term(text, term):
@@ -141,7 +104,7 @@ def find_conflicts(record, restrictions):
 
 def check_dish_safety(user_restrictions, rag_result):
     """Classify one RAG result using deterministic dietary and allergy rules."""
-    restrictions = normalize_restrictions(user_restrictions)
+    restrictions = user_restrictions or []
     record = rag_record(rag_result)
     dish_name = (
         record.get("requested_dish")

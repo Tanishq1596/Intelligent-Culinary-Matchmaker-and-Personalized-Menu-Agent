@@ -65,24 +65,24 @@ def parse_user_request(request, existing_preferences, catalog):
 
     restrictions = list(preferences.get("restrictions", []))
     if "lactose intolerant" in text or "lactose intolerance" in text:
-        add_once(restrictions, "Lactose intolerance")
+        add_once(restrictions, "lactose intolerance")
     if "gluten sensitive" in text or "gluten sensitivity" in text:
-        add_once(restrictions, "Gluten sensitivity")
+        add_once(restrictions, "gluten sensitivity")
     if "vegan" in text:
-        add_once(restrictions, "Vegan")
+        add_once(restrictions, "vegan")
     elif preferences.get("dietary_preference") == "Veg":
-        add_once(restrictions, "Vegetarian")
+        add_once(restrictions, "vegetarian")
 
     if "allerg" in text or "free" in text:
         allergy_terms = {
-            "peanut": "Peanut allergy",
-            "groundnut": "Peanut allergy",
-            "tree nut": "Tree-nut allergy",
-            "cashew": "Tree-nut allergy",
-            "almond": "Tree-nut allergy",
-            "egg": "Egg allergy",
-            "soy": "Soy allergy",
-            "soya": "Soy allergy",
+            "peanut": "peanut allergy",
+            "groundnut": "peanut allergy",
+            "tree nut": "tree nut allergy",
+            "cashew": "tree nut allergy",
+            "almond": "tree nut allergy",
+            "egg": "egg allergy",
+            "soy": "soy allergy",
+            "soya": "soy allergy",
         }
         for term, restriction in allergy_terms.items():
             if term in text:
@@ -90,4 +90,3 @@ def parse_user_request(request, existing_preferences, catalog):
 
     preferences["restrictions"] = restrictions
     return preferences
-
