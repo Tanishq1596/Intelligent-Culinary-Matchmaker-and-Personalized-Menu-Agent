@@ -1,6 +1,5 @@
 """Deterministic dietary and allergen checks for retrieved dish knowledge."""
 
-from collections.abc import Mapping
 import re
 
 
@@ -64,15 +63,6 @@ def has_term(text, term):
     return f" {normalize_text(term)} " in f" {normalize_text(text)} "
 
 
-def rag_record(rag_result):
-    """Accept either a RetrievalResult object or its dictionary representation."""
-    if isinstance(rag_result, Mapping):
-        return dict(rag_result)
-    if hasattr(rag_result, "to_dict"):
-        return rag_result.to_dict()
-    raise TypeError("rag_result must be a RetrievalResult or dictionary")
-
-
 def find_conflicts(record, restrictions):
     """Return detected terms with direct conflicts taking priority."""
     conflicts = {}
@@ -101,7 +91,7 @@ def find_conflicts(record, restrictions):
 def check_dish_safety(user_restrictions, rag_result):
     """Classify one RAG result using deterministic dietary and allergy rules."""
     restrictions = user_restrictions or []
-    record = rag_record(rag_result)
+    record = rag_result
     dish_name = (
         record.get("requested_dish")
         or record.get("dish_name")
