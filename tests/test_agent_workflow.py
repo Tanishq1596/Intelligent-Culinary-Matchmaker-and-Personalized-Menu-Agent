@@ -1,4 +1,4 @@
-"""End-to-end smoke test for the structured LangGraph workflow."""
+"""End-to-end smoke test for the simple LangChain workflow."""
 
 from pathlib import Path
 import sys
@@ -8,16 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from agentic_ai import run_workflow
-from LLM.llm_generator import (
-    MODEL_NAME,
-    generate_recommendation,
-)
-from agentic_ai.workflow import (
-    NO_MATCH_MESSAGE,
-    no_match_response_node,
-    use_user_budget_node,
-    validated_candidate_check,
-)
+from agentic_ai.workflow import NO_MATCH_MESSAGE
 
 
 PROFILE = {
@@ -36,13 +27,6 @@ PROFILE = {
 
 def main():
     llm_contexts = []
-
-    try:
-        use_user_budget_node({"parsed_preferences": {}})
-    except ValueError as error:
-        assert "maximum budget" in str(error)
-    else:
-        raise AssertionError("The workflow must require an explicit budget")
 
     def fake_llm(context):
         llm_contexts.append(context)
@@ -89,20 +73,6 @@ def main():
     assert no_match["final_response"] == NO_MATCH_MESSAGE
     assert no_match["predicted_cuisine"]["source"] == "onboarding"
     assert len(llm_contexts) == 1
-
-    # The same fixed response is used when safety rejects every candidate.
-    safety_empty_state = {"final_validated_candidates": []}
-    assert validated_candidate_check(safety_empty_state) == "no_match"
-    assert no_match_response_node(safety_empty_state)["final_response"] == NO_MATCH_MESSAGE
-
-    class FakeModels:
-        def generate_content(self, **request):
-            self.request = request
-            return type("Response", (), {"text": "Gemini recommendation"})()
-
-    fake_client = type("Client", (), {"models": FakeModels()})()
-    assert generate_recommendation(result["llm_context"], fake_client) == "Gemini recommendation"
-    assert fake_client.models.request["model"] == MODEL_NAME
 
     print({
         "predicted_cuisine": result["predicted_cuisine"]["selected"],

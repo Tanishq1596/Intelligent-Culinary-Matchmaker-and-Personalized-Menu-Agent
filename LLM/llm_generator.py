@@ -1,16 +1,17 @@
 """Generate a grounded recommendation from validated dish candidates."""
 
 import json
-import os
 
-from google import genai
-from google.genai import types
+from langchain.agents import create_agent
+from langchain.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 MODEL_NAME = "gemini-3.6-flash"
 
 SYSTEM_INSTRUCTIONS = """
-You explain validated culinary recommendations.
+You explain validated culinary recommendations. Always call the
+get_validated_candidates tool before answering.
 
 Rules:
 - Use only the candidate dishes supplied in the context.
@@ -65,27 +66,28 @@ def prepare_llm_context(state):
     }
 
 
-def generate_recommendation(context, client=None):
-    """Ask Gemini to explain the supplied validated candidates."""
-    if not context.get("candidates"):
-        raise ValueError("Gemini cannot be called without valid candidates")
+def generate_recommendation(context):
+    """Use a simple LangChain agent to explain validated candidates."""
 
-    if client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError("Set GEMINI_API_KEY before requesting a recommendation")
-        client = genai.Client(api_key=api_key)
+    @tool
+    def get_validated_candidates() -> str:
+        """Return the user profile and dishes already validated by safety rules."""
+        return json.dumps(context, indent=2, ensure_ascii=False)
 
-    response = client.models.generate_content(
+    model = ChatGoogleGenerativeAI(
         model=MODEL_NAME,
-        contents=json.dumps(context, indent=2, ensure_ascii=False),
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTIONS,
-            max_output_tokens=800,
-        ),
+        thinking_level="minimal",
+        max_tokens=1200,
     )
-
-    final_response = (response.text or "").strip()
-    if not final_response:
-        raise RuntimeError("Gemini returned an empty recommendation")
-    return final_response
+    agent = create_agent(
+        model=model,
+        tools=[get_validated_candidates],
+        system_prompt=SYSTEM_INSTRUCTIONS,
+    )
+    result = agent.invoke({
+        "messages": [{
+            "role": "user",
+            "content": "Use the validated candidates and recommend the best meal.",
+        }]
+    })
+    return str(result["messages"][-1].text)

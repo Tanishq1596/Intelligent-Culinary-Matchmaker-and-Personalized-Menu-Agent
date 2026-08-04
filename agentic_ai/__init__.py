@@ -1,5 +1,5 @@
-"""LangGraph orchestration for the culinary recommendation workflow."""
+"""LangChain orchestration for the culinary recommendation workflow."""
 
-from .workflow import build_workflow, run_workflow
+from .workflow import run_workflow
 
-__all__ = ["build_workflow", "run_workflow"]
+__all__ = ["run_workflow"]

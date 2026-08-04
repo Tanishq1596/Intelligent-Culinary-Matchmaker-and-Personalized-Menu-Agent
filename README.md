@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-1C3C3C)](https://www.langchain.com/langgraph)
+[![LangChain](https://img.shields.io/badge/Agent-LangChain-1C3C3C)](https://www.langchain.com/)
 [![scikit-learn](https://img.shields.io/badge/ML-scikit--learn-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
 
 An end-to-end culinary recommendation system that predicts cuisine preference, filters real restaurant dishes using the user's explicit budget, enriches them with culinary knowledge, applies deterministic dietary safety rules, and asks Gemini to explain only validated recommendations.
@@ -39,7 +39,7 @@ flowchart TD
     H --> I{Valid candidates?}
     I -->|No| J[Fixed no-match response]
     I -->|Yes| K[Rank validated candidates]
-    K --> L[Gemini grounded explanation]
+    K --> L[LangChain agent with Gemini]
 ```
 
 ### Responsibility Boundaries
@@ -50,7 +50,8 @@ flowchart TD
 | Pandas filter | Enforce location, price, cuisine, and food-preference constraints |
 | RAG | Retrieve common recipe knowledge for shortlisted dishes |
 | Safety engine | Detect known conflicts and assign deterministic safety states |
-| LangGraph | Route execution, fallbacks, validation, and no-match behavior |
+| Python workflow | Run tools in order and handle fallback and no-match behavior |
+| LangChain agent | Read validated context through a tool and generate the response |
 | Gemini | Explain supplied validated candidates without inventing facts |
 
 ## Verified Results
@@ -92,7 +93,7 @@ Only likely-compatible and warning candidates may reach Gemini. Rejected and unk
 .
 |-- app.py                         # Streamlit application
 |-- agentic_ai/
-|   |-- workflow.py                # LangGraph state and routing
+|   |-- workflow.py                # Simple ordered LangChain tool workflow
 |   |-- tools.py                   # ML, filtering, RAG, and safety tools
 |   `-- request_parser.py
 |-- LLM/
