@@ -89,7 +89,6 @@ def build_taxonomy(source_path: Path) -> list[dict]:
 
 
 def write_taxonomy(taxonomy: list[dict], output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     fields = ["cuisine", "source_record_count", "source_share", "median_dish_price"]
     with output_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)

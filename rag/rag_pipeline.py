@@ -93,7 +93,6 @@ def create_document(row):
 def load_embedding_model():
     from sentence_transformers import SentenceTransformer
 
-    MODEL_CACHE_PATH.mkdir(parents=True, exist_ok=True)
     return SentenceTransformer(
         EMBEDDING_MODEL,
         cache_folder=str(MODEL_CACHE_PATH),
@@ -102,7 +101,6 @@ def load_embedding_model():
 
 
 def get_chroma_client():
-    VECTOR_DB_PATH.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(VECTOR_DB_PATH))
 
 
