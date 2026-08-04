@@ -23,9 +23,6 @@ def extract_budget(request):
 
 def parse_user_request(request, existing_preferences, catalog):
     """Merge request details with known profile and order-history values."""
-    if not str(request).strip():
-        raise ValueError("user_request cannot be blank")
-
     preferences = dict(existing_preferences or {})
     text = " ".join(str(request).casefold().replace("-", " ").split())
 
@@ -58,10 +55,6 @@ def parse_user_request(request, existing_preferences, catalog):
     budget = extract_budget(request)
     if budget is not None:
         preferences["user_budget"] = budget
-
-    rating_match = re.search(r"(?:rating|rated)\s*(?:of|above|at least)?\s*([0-5](?:\.\d)?)", text)
-    if rating_match:
-        preferences["minimum_rating"] = float(rating_match.group(1))
 
     restrictions = list(preferences.get("restrictions", []))
     if "lactose intolerant" in text or "lactose intolerance" in text:

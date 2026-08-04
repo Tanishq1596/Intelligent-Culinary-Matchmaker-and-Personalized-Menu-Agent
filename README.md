@@ -164,7 +164,6 @@ Run the focused checks from the repository root:
 ```powershell
 python tests/test_ml_prediction.py
 python tests/test_safety_rules.py
-python tests/test_agent_workflow.py
 ```
 
 Evaluate RAG retrieval:

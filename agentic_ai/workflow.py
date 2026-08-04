@@ -39,30 +39,19 @@ def filter_dishes(preferences, budget, cuisine):
         "cuisine": cuisine,
         "budget": budget,
         "dietary_preference": preferences.get("dietary_preference"),
-        "minimum_rating": preferences.get("minimum_rating"),
         "top_n": 10,
     })
 
 
 def no_match(state):
-    state["final_validated_candidates"] = []
-    state["error_message"] = NO_MATCH_MESSAGE
     state["final_response"] = NO_MATCH_MESSAGE
     return state
 
 
-def run_workflow(user_request, user_profile=None, llm_generator=None):
+def run_workflow(user_request, user_profile=None):
     """Run the culinary tools in their required safety order."""
     preferences = parse_user_request(user_request, user_profile, get_catalog())
-    if not preferences.get("city"):
-        raise ValueError("The request must provide a supported city or locality")
-
-    budget = preferences.get("user_budget")
-    if budget is None:
-        raise ValueError("A maximum budget is required")
-    budget = float(budget)
-    if budget <= 0:
-        raise ValueError("User budget must be positive")
+    budget = float(preferences["user_budget"])
 
     features = classifier_input(preferences)
     if int(features.get("order_frequency", 0)) >= MINIMUM_HISTORY_ORDERS:
@@ -70,16 +59,10 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
         prediction_source = "history_model"
     else:
         preferred = preferences.get("preferred_cuisines", [])
-        if isinstance(preferred, str):
-            preferred = [preferred]
         predictions = [
             {"cuisine": str(cuisine), "probability": None}
             for cuisine in preferred
         ]
-        if not predictions:
-            raise ValueError(
-                "Cuisine prediction needs returning-user history or onboarding cuisines"
-            )
         prediction_source = "onboarding"
 
     primary = predictions[0]
@@ -101,7 +84,6 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
         "rag_results": [],
         "safety_results": [],
         "final_validated_candidates": [],
-        "error_message": "",
         "llm_context": {},
         "final_response": "",
     }
@@ -110,11 +92,6 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
     if not candidates and secondary:
         predicted_cuisine["selected"] = secondary
         candidates = filter_dishes(preferences, budget, secondary["cuisine"])
-        if candidates:
-            state["error_message"] = (
-                "Primary cuisine had no matches; used second predicted cuisine: "
-                f"{secondary['cuisine']}."
-            )
 
     state["filtered_candidates"] = candidates
     if not candidates:
@@ -128,7 +105,6 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
     state["rag_results"] = rag_results
     state["safety_results"] = safety_results
 
-    selected_cuisine = predicted_cuisine["selected"]
     validated = []
     for candidate, knowledge, safety in zip(candidates, rag_results, safety_results):
         status = safety["safety_status"]
@@ -136,27 +112,16 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
             continue
 
         validated.append({
-            "recommendation_type": "primary" if status == "Likely compatible" else "warning",
             "dish_name": candidate["dish_name"],
             "restaurant_name": candidate["restaurant_name"],
-            "city": candidate["city"],
             "locality": candidate["locality"],
             "price": candidate["dish_price"],
             "restaurant_rating": candidate["restaurant_rating"],
-            "rating_count": candidate["rating_count"],
-            "predicted_cuisine": selected_cuisine["cuisine"],
-            "cuisine_probability": selected_cuisine.get("probability"),
-            "matched_dish": knowledge.get("matched_dish"),
             "common_ingredients": knowledge.get("common_ingredients"),
             "allergens": knowledge.get("allergens"),
-            "dietary_tags": knowledge.get("dietary_tags"),
             "possible_substitutions": knowledge.get("possible_substitutions"),
-            "source": knowledge.get("source"),
             "safety_status": status,
-            "detected_conflicts": safety["detected_conflicts"],
-            "conflict_level": safety["conflict_level"],
             "reason": safety["reason"],
-            "disclaimer": safety["disclaimer"],
         })
 
     if not validated:
@@ -173,6 +138,5 @@ def run_workflow(user_request, user_profile=None, llm_generator=None):
     ]
     state["llm_context"] = prepare_llm_context(state)
 
-    generator = llm_generator or generate_recommendation
-    state["final_response"] = generator(state["llm_context"])
+    state["final_response"] = generate_recommendation(state["llm_context"])
     return state

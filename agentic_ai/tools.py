@@ -38,7 +38,6 @@ def filter_restaurant_dishes(
     cuisine: str,
     budget: float,
     dietary_preference: str | None = None,
-    minimum_rating: float | None = None,
     top_n: int = 10,
 ) -> list[dict]:
     """Return real restaurant dishes matching all supplied hard constraints."""
@@ -48,7 +47,6 @@ def filter_restaurant_dishes(
         cuisine=cuisine,
         budget=budget,
         dietary_preference=dietary_preference,
-        minimum_rating=minimum_rating,
         top_n=top_n,
     )
 
