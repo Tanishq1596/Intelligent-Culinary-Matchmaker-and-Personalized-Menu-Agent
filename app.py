@@ -249,16 +249,9 @@ locality_list = sorted(
 with locality_column:
     if locality_list:
         locality_choice = st.selectbox("Locality", ["Any locality", *locality_list])
+        locality = None if locality_choice == "Any locality" else locality_choice
     else:
-        locality_choice = st.selectbox(
-            "Locality",
-            ["Locality data unavailable"],
-            disabled=True,
-        )
-        st.caption(f"Recommendations will search across all of {city}.")
-locality = None if locality_choice == "Any locality" else locality_choice
-if not locality_list:
-    locality = None
+        locality = None
 
 user_id = None
 order_count = 0
