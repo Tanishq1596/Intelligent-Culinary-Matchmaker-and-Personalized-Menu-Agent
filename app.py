@@ -17,18 +17,10 @@ from src.ml_prediction import MINIMUM_HISTORY_ORDERS
 HISTORY_PATH = PROJECT_ROOT / "data" / "user_order_history.csv"
 RESTAURANT_PATH = PROJECT_ROOT / "data" / "swiggy_cleaned_sample_expanded.csv"
 
-RESTRICTION_OPTIONS = {
-    "Lactose intolerant": "lactose intolerance",
-    "Gluten sensitive": "gluten sensitivity",
-    "Vegan": "vegan",
-}
-
-ALLERGY_OPTIONS = {
-    "Peanut allergy": "peanut allergy",
-    "Tree-nut allergy": "tree nut allergy",
-    "Egg allergy": "egg allergy",
-    "Soy allergy": "soy allergy",
-}
+RESTRICTION_OPTIONS = ["lactose intolerance", "gluten sensitivity", "vegan"]
+ALLERGY_OPTIONS = [
+    "peanut allergy", "tree nut allergy", "egg allergy", "soy allergy"
+]
 
 MINIMUM_ONBOARDING_DISHES = 5
 MAX_ONBOARDING_CUISINES = 30
@@ -131,11 +123,7 @@ def build_user_profile(
     order_count = len(user_orders)
     day_type = "Weekend" if datetime.now().weekday() >= 5 else "Weekday"
 
-    selected_restrictions = [
-        RESTRICTION_OPTIONS[item] for item in restrictions
-    ] + [
-        ALLERGY_OPTIONS[item] for item in allergies
-    ]
+    selected_restrictions = restrictions + allergies
 
     profile = {
         "city": city,
@@ -317,7 +305,7 @@ if st.button(
     "Find My Meal", icon=":material/search:", type="primary", use_container_width=True,
     disabled=not history_eligible and not available_onboarding_cuisines,
 ):
-    if "Vegan" in restrictions and food_preference != "Vegetarian":
+    if "vegan" in restrictions and food_preference != "Vegetarian":
         st.error("Select Vegetarian when using the Vegan restriction.")
     elif not history_eligible and not preferred_cuisines:
         st.error("Select at least one preferred cuisine for a new user.")
