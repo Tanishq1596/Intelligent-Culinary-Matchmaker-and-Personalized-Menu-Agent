@@ -1,6 +1,5 @@
 """Streamlit interface for the intelligent culinary matchmaker."""
 
-from collections import Counter
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -115,10 +114,9 @@ def available_cuisines(dishes, city, locality, budget, food_preference):
     return robust_cuisines.head(MAX_ONBOARDING_CUISINES).index.tolist()
 
 
-def most_common(values):
-    """Return the most frequent non-empty value."""
-    cleaned = [str(value) for value in values if pd.notna(value) and str(value).strip()]
-    return Counter(cleaned).most_common(1)[0][0]
+def find_favourite_cuisine(user_orders):
+    cuisine_counts = user_orders["ordered_cuisine"].value_counts()
+    return cuisine_counts.index[0]
 
 
 def build_user_profile(
@@ -154,7 +152,7 @@ def build_user_profile(
         profile["personalization_mode"] = "onboarding"
         return profile
 
-    favourite_cuisine = most_common(user_orders["ordered_cuisine"])
+    favourite_cuisine = find_favourite_cuisine(user_orders)
     cuisine_orders = int((user_orders["ordered_cuisine"] == favourite_cuisine).sum())
     profile.update({
         "personalization_mode": "history_model",
